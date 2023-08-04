@@ -13,7 +13,7 @@ async def consume_messages():
         subscription_path = f"projects/{settings.GCP_PROJECT_ID}/subscriptions/{settings.TRANSFORMED_OBSERVATIONS_SUB_ID}"
         while True:
             pull_tasks = []
-            for i in range(settings.CONCURRENCY):
+            for i in range(settings.PULL_CONCURRENCY):
                 pull_tasks.append(
                     asyncio.ensure_future(
                         client.pull(
@@ -25,7 +25,11 @@ async def consume_messages():
                 )
 
             results = await asyncio.gather(*pull_tasks, return_exceptions=True)
-            messages = [m for m in results if isinstance(m, SubscriberMessage)]
+            messages = []
+            for r in results:
+                if isinstance(r, Exception):
+                    continue
+                messages.extend(r)
 
             # Process messages if any
             if not messages:
