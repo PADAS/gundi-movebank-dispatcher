@@ -1,41 +1,47 @@
 import asyncio
+import datetime
 import logging
-from gcloud.aio.pubsub import SubscriberClient, SubscriberMessage
+from gcloud.aio.pubsub import SubscriberClient, SubscriberMessage, subscribe
 from . import settings
 
 
 logger = logging.getLogger(__name__)
 
 
+messages = []
+last_sending_dt = datetime.datetime.now()
+
+
+async def process_message(message):
+    global messages
+    global last_sending_dt
+    now_dt = datetime.datetime.now()
+    print(f"[{now_dt}] Message received: \n {message}")
+    messages.append(message)
+    time_since_last_sending = (now_dt - last_sending_dt).total_seconds()
+    if len(messages) >= settings.MESSAGES_PER_FILE:
+        last_sending_dt = datetime.datetime.now()
+        print(
+            f"[{last_sending_dt}] Sending {len(messages)} messages to Movebank (after {time_since_last_sending} secs).."
+        )
+        messages.clear()
+    return
+
+
 async def consume_messages():
-    async with SubscriberClient() as client:
-        # pull messages
-        subscription_path = f"projects/{settings.GCP_PROJECT_ID}/subscriptions/{settings.TRANSFORMED_OBSERVATIONS_SUB_ID}"
-        while True:
-            pull_tasks = []
-            for i in range(settings.PULL_CONCURRENCY):
-                pull_tasks.append(
-                    asyncio.ensure_future(
-                        client.pull(
-                            subscription_path,
-                            max_messages=settings.BATCH_MAX_MESSAGES,  # Pull up to BATCH_MAX_MESSAGES from the topic
-                            timeout=settings.BATCH_READ_TIMEOUT  # seconds
-                        )
-                    )
-                )
+    subscription_path = f"projects/{settings.GCP_PROJECT_ID}/subscriptions/{settings.TRANSFORMED_OBSERVATIONS_SUB_ID}"
+    print(f"[{last_sending_dt}] Consuming messages from: \n {subscription_path}")
+    async with SubscriberClient() as subscriber_client:
+        await subscribe(
+            subscription_path,
+            process_message,
+            subscriber_client,
+            num_producers=settings.PULL_CONCURRENCY,
+            max_messages_per_producer=settings.BATCH_MAX_MESSAGES,
+            ack_window=0.3,
+            num_tasks_per_consumer=settings.BATCH_MAX_MESSAGES,
+            enable_nack=True,
+            nack_window=0.3,
+        )
+    print(f"Consumer stopped.")
 
-            results = await asyncio.gather(*pull_tasks, return_exceptions=True)
-            messages = []
-            for r in results:
-                if isinstance(r, Exception):
-                    continue
-                messages.extend(r)
-
-            # Process messages if any
-            if not messages:
-                print(f"No messages to process. Continue")
-                continue
-
-            print(f"Messages Received: \n{messages}")
-            # ToDo: Send messages to Movebank
-            # ToDo: Acknowledge processed messages
