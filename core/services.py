@@ -1,7 +1,6 @@
-import asyncio
 import datetime
 import logging
-from gcloud.aio.pubsub import SubscriberClient, SubscriberMessage, subscribe
+from google.cloud import pubsub_v1
 from . import settings
 
 
@@ -12,7 +11,7 @@ messages = []
 last_sending_dt = datetime.datetime.now()
 
 
-async def process_message(message):
+def process_message(message):
     global messages
     global last_sending_dt
     now_dt = datetime.datetime.now()
@@ -25,23 +24,28 @@ async def process_message(message):
             f"[{last_sending_dt}] Sending {len(messages)} messages to Movebank (after {time_since_last_sending} secs).."
         )
         messages.clear()
+    message.ack()
     return
 
 
-async def consume_messages():
-    subscription_path = f"projects/{settings.GCP_PROJECT_ID}/subscriptions/{settings.TRANSFORMED_OBSERVATIONS_SUB_ID}"
+def consume_messages():
+    subscriber = pubsub_v1.SubscriberClient()
+    subscription_path = subscriber.subscription_path(
+        settings.GCP_PROJECT_ID,
+        settings.TRANSFORMED_OBSERVATIONS_SUB_ID
+    )
     print(f"[{last_sending_dt}] Consuming messages from: \n {subscription_path}")
-    async with SubscriberClient() as subscriber_client:
-        await subscribe(
-            subscription_path,
-            process_message,
-            subscriber_client,
-            num_producers=settings.PULL_CONCURRENCY,
-            max_messages_per_producer=settings.BATCH_MAX_MESSAGES,
-            ack_window=0.3,
-            num_tasks_per_consumer=settings.BATCH_MAX_MESSAGES,
-            enable_nack=True,
-            nack_window=0.3,
-        )
+    streaming_pull_future = subscriber.subscribe(
+        subscription_path,
+        callback=process_message
+    )
+    # Wrap subscriber in a 'with' block to automatically call close() when done.
+    with subscriber:
+        try:
+            streaming_pull_future.result()
+        except Exception as e:
+            logger.error(f"Internal Error {e}. Shutting down..\n")
+            streaming_pull_future.cancel()  # Trigger the shutdown.
+            streaming_pull_future.result()  # Block until the shutdown is complete.
     print(f"Consumer stopped.")
 
