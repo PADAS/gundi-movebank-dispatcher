@@ -15,7 +15,7 @@ def process_message(message):
     global messages
     global last_sending_dt
     now_dt = datetime.datetime.now()
-    print(f"[{now_dt}] Message received: \n {message}")
+    print(f"[{now_dt}] Message received.")
     messages.append(message)
     time_since_last_sending = (now_dt - last_sending_dt).total_seconds()
     if len(messages) >= settings.MESSAGES_PER_FILE:
