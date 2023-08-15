@@ -16,7 +16,7 @@ from gundi_client_v2 import GundiClient
 from redis import exceptions as redis_exceptions
 from gcloud.aio import pubsub
 from . import settings
-from .errors import ReferenceDataError
+#from .errors import ReferenceDataError
 
 
 logger = logging.getLogger(__name__)
@@ -481,3 +481,10 @@ async def publish_event(event: SystemEventBaseModel, topic_name: str):
             logger.debug(f"System event {event} published successfully.")
             logger.debug(f"GCP PubSub response: {response}")
 
+
+async def periodic_task(interval, func, *args, **kwargs):
+    while True:
+        await asyncio.gather(
+            func(*args, **kwargs),
+            asyncio.sleep(interval),
+        )
