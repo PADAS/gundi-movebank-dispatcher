@@ -1,4 +1,4 @@
-# ToDo: Move base classes or utils into the SDK
+# ToDo: Move base classes or utils into some common package?
 import asyncio
 import base64
 import json
@@ -16,7 +16,7 @@ from gundi_client_v2 import GundiClient
 from redis import exceptions as redis_exceptions
 from gcloud.aio import pubsub
 from . import settings
-#from .errors import ReferenceDataError
+from .errors import ReferenceDataError
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,12 @@ def get_redis_db():
 
 _cache_ttl = settings.PORTAL_CONFIG_OBJECT_CACHE_TTL
 _cache_db = get_redis_db()
-portal = PortalApi()
+connect_timeout, read_timeout = settings.DEFAULT_REQUESTS_TIMEOUT
+portal = PortalApi(
+    connect_timeout=connect_timeout,
+    data_timeout=read_timeout,
+    max_http_retries=10
+)
 
 
 def read_config_from_cache_safe(cache_key, extra_dict):
@@ -96,158 +101,34 @@ async def get_outbound_config_detail(
 
     # Retrieve outbound integration details from the portal
     logger.debug(f"Cache miss for outbound integration detail.", extra={**extra_dict})
-    connect_timeout, read_timeout = settings.DEFAULT_REQUESTS_TIMEOUT
-    timeout_settings = aiohttp.ClientTimeout(
-        sock_connect=connect_timeout, sock_read=read_timeout
-    )
-    async with aiohttp.ClientSession(
-        timeout=timeout_settings, raise_for_status=True
-    ) as s:
-        try:
-            response = await portal.get_outbound_integration(
-                session=s, integration_id=str(outbound_id)
-            )
-        except aiohttp.ServerTimeoutError as e:
-            target_url = (
-                f"{settings.PORTAL_OUTBOUND_INTEGRATIONS_ENDPOINT}/{str(outbound_id)}"
-            )
-            logger.error(
-                "Read Timeout",
-                extra={**extra_dict, ExtraKeys.Url: target_url},
-            )
-            raise ReferenceDataError(f"Read Timeout for {target_url}")
-        except aiohttp.ClientConnectionError as e:
-            target_url = (
-                f"{settings.PORTAL_OUTBOUND_INTEGRATIONS_ENDPOINT}/{str(outbound_id)}"
-            )
-            logger.error(
-                "Connection Error",
-                extra={**extra_dict, ExtraKeys.Url: target_url},
-            )
-            raise ReferenceDataError(f"Failed to connect to the portal at {target_url}, {e}")
-        except aiohttp.ClientResponseError as e:
-            target_url = str(e.request_info.url)
-            logger.exception(
-                "Portal returned bad response during request for outbound config detail",
-                extra={
-                    ExtraKeys.AttentionNeeded: True,
-                    ExtraKeys.OutboundIntId: outbound_id,
-                    ExtraKeys.Url: target_url,
-                    ExtraKeys.StatusCode: e.status,
-                },
-            )
-            raise ReferenceDataError(
-                f"Request for OutboundIntegration({outbound_id}) returned bad response"
-            )
-        else:
-            try:
-                config = gundi_schemas.OutboundConfiguration.parse_obj(response)
-            except Exception:
-                logger.error(
-                    f"Failed decoding response for Outbound Integration Detail",
-                    extra={**extra_dict, "resp_text": response},
-                )
-                raise ReferenceDataError(
-                    "Failed decoding response for Outbound Integration Detail"
-                )
-            else:
-                if config:  # don't cache empty response
-                    write_config_in_cache_safe(
-                        key=cache_key,
-                        ttl=_cache_ttl,
-                        config=config,
-                        extra_dict=extra_dict
-                    )
-                return config
-
-
-async def get_inbound_integration_detail(
-    integration_id: UUID,
-) -> gundi_schemas.IntegrationInformation:
-    if not integration_id:
-        raise ValueError("integration_id must not be None")
-
-    extra_dict = {
-        ExtraKeys.AttentionNeeded: True,
-        ExtraKeys.InboundIntId: str(integration_id),
-    }
-
-    cache_key = f"inbound_detail.{integration_id}"
-    cached = read_config_from_cache_safe(cache_key=cache_key, extra_dict=extra_dict)
-
-    if cached:
-        config = gundi_schemas.IntegrationInformation.parse_raw(cached)
-        logger.debug(
-            "Using cached inbound integration detail",
-            extra={**extra_dict, "integration_detail": config},
+    try:
+        response = await portal.get_outbound_integration(
+            integration_id=str(outbound_id)
         )
-        return config
-
-    logger.debug(f"Cache miss for inbound integration detai", extra={**extra_dict})
-
-    connect_timeout, read_timeout = settings.DEFAULT_REQUESTS_TIMEOUT
-    timeout_settings = aiohttp.ClientTimeout(
-        sock_connect=connect_timeout, sock_read=read_timeout
-    )
-    async with aiohttp.ClientSession(
-        timeout=timeout_settings, raise_for_status=True
-    ) as s:
+    except Exception as e:
+        raise ReferenceDataError(
+            f"Request for OutboundIntegration({outbound_id}) returned bad response"
+        )
+    else:
         try:
-            response = await portal.get_inbound_integration(
-                session=s, integration_id=str(integration_id)
-            )
-        except aiohttp.ServerTimeoutError as e:
-            target_url = (
-                f"{settings.PORTAL_INBOUND_INTEGRATIONS_ENDPOINT}/{str(integration_id)}"
-            )
+            config = gundi_schemas.OutboundConfiguration.parse_obj(response)
+        except Exception:
             logger.error(
-                "Read Timeout",
-                extra={**extra_dict, ExtraKeys.Url: target_url},
-            )
-            raise ReferenceDataError(f"Read Timeout for {target_url}")
-        except aiohttp.ClientConnectionError as e:
-            target_url = (
-                f"{settings.PORTAL_OUTBOUND_INTEGRATIONS_ENDPOINT}/{str(integration_id)}"
-            )
-            logger.error(
-                "Connection Error",
-                extra={**extra_dict, ExtraKeys.Url: target_url},
-            )
-            raise ReferenceDataError(f"Failed to connect to the portal at {target_url}, {e}")
-        except aiohttp.ClientResponseError as e:
-            target_url = str(e.request_info.url)
-            logger.exception(
-                "Portal returned bad response during request for inbound config detail",
-                extra={
-                    ExtraKeys.AttentionNeeded: True,
-                    ExtraKeys.InboundIntId: integration_id,
-                    ExtraKeys.Url: target_url,
-                    ExtraKeys.StatusCode: e.status,
-                },
+                f"Failed decoding response for Outbound Integration Detail",
+                extra={**extra_dict, "resp_text": response},
             )
             raise ReferenceDataError(
-                f"Request for InboundIntegration({integration_id})"
+                "Failed decoding response for Outbound Integration Detail"
             )
         else:
-            try:
-                config = gundi_schemas.IntegrationInformation.parse_obj(response)
-            except Exception:
-                logger.error(
-                    f"Failed decoding response for InboundIntegration Detail",
-                    extra={**extra_dict, "resp_text": response},
+            if config:  # don't cache empty response
+                write_config_in_cache_safe(
+                    key=cache_key,
+                    ttl=_cache_ttl,
+                    config=config,
+                    extra_dict=extra_dict
                 )
-                raise ReferenceDataError(
-                    "Failed decoding response for InboundIntegration Detail"
-                )
-            else:
-                if config:  # don't cache empty response
-                    write_config_in_cache_safe(
-                        key=cache_key,
-                        ttl=_cache_ttl,
-                        config=config,
-                        extra_dict=extra_dict
-                    )
-                return config
+            return config
 
 
 async def get_integration_details(integration_id: str) -> gundi_schemas.v2.Integration:

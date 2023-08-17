@@ -1,6 +1,6 @@
 import asyncio
 import logging
-#from core import tracing
+from core import tracing
 from core.services import consume_messages, flush_messages
 from core.utils import periodic_task
 

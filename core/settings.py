@@ -32,7 +32,6 @@ TRACE_ENVIRONMENT = env.str("TRACE_ENVIRONMENT", "dev")
 GCP_PROJECT_ID = env.str("GCP_PROJECT_ID", "cdip-78ca")
 DEAD_LETTER_TOPIC = env.str("DEAD_LETTER_TOPIC", "destinations-dead-letter-stage")
 DISPATCHER_EVENTS_TOPIC = env.str("DISPATCHER_EVENTS_TOPIC", "dispatcher-events-stage")
-MAX_EVENT_AGE_SECONDS = env.int("MAX_EVENT_AGE_SECONDS", 86400)  # 24hrs
 TRANSFORMED_OBSERVATIONS_SUB_ID = env.str("TRANSFORMED_OBSERVATIONS_SUB_ID")
 BATCH_MAX_MESSAGES = env.int("BATCH_MAX_MESSAGES", 20)  # Messages pulled and sent in batches to Movebank
 PULL_CONCURRENCY = env.int("PULL_CONCURRENCY", 5)
