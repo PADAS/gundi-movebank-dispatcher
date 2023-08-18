@@ -62,6 +62,7 @@ class MBTagDataDispatcher(MBDispatcher):
 
     async def send(self, messages: list, **kwargs):
         result = None
+        # ToDo: Handle validation errors and raise ReferenceDataError?
         feed = self.configuration.additional.get("feed")
         tag = kwargs.get("tag")
         return await send_data_to_movebank(
@@ -99,6 +100,7 @@ class MBDispatcherV2(ABC):
             raise ValueError(
                 f"Authentication settings for integration {str(integration.id)} are missing. Please fix the integration setup in the portal."
             )
+        # ToDo: Handle validation errors and raise ReferenceDataError?
         auth_config = schemas.v2.MBAuthActionConfig.parse_obj(auth_action_config.data)
         return MovebankClient(
             base_url=integration.base_url,
@@ -131,6 +133,7 @@ class MBTagDataDispatcherV2(MBDispatcherV2):
             raise ValueError(
                 f"Push settings for integration {str(self.integration.id)} are missing. Please fix the integration setup in the portal."
             )
+        # ToDo: Handle validation errors and raise ReferenceDataError?
         push_config = schemas.v2.MBPushObservationsActionConfig.parse_obj(push_obs_action_config.data)
         feed = push_config.feed
         tag = kwargs.get("tag")
