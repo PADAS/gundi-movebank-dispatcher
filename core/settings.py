@@ -1,3 +1,6 @@
+import logging
+import logging.config
+import sys
 from cdip_connector.core import cdip_settings
 from environs import Env
 
@@ -5,6 +8,32 @@ env = Env()
 env.read_env()
 
 LOGGING_LEVEL = env.str("LOGGING_LEVEL", "INFO")
+
+DEFAULT_LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "format": "%(asctime)s %(levelname)s %(processName)s %(thread)d %(name)s %(message)s",
+            "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
+        },
+    },
+    "handlers": {
+        "console": {
+            "level": LOGGING_LEVEL,
+            "class": "logging.StreamHandler",
+            "stream": sys.stdout,
+            "formatter": "json",
+        },
+    },
+    "loggers": {
+        "": {
+            "handlers": ["console"],
+            "level": LOGGING_LEVEL,
+        },
+    },
+}
+logging.config.dictConfig(DEFAULT_LOGGING)
 
 DEFAULT_REQUESTS_TIMEOUT = (10, 20)  # Connect, Read
 
@@ -27,12 +56,13 @@ DISPATCHED_OBSERVATIONS_CACHE_TTL = env.int("PORTAL_CONFIG_OBJECT_CACHE_TTL", 60
 # Used in OTel traces/spans to set the 'environment' attribute, used on metrics calculation
 TRACE_ENVIRONMENT = env.str("TRACE_ENVIRONMENT", "dev")
 
-# Retries and dead-letter settings
-# ToDo: Get retry settings from the outbound config?
+# GCP related settings
 GCP_PROJECT_ID = env.str("GCP_PROJECT_ID", "cdip-78ca")
 DEAD_LETTER_TOPIC = env.str("DEAD_LETTER_TOPIC", "destinations-dead-letter-stage")
 DISPATCHER_EVENTS_TOPIC = env.str("DISPATCHER_EVENTS_TOPIC", "dispatcher-events-stage")
 TRANSFORMED_OBSERVATIONS_SUB_ID = env.str("TRANSFORMED_OBSERVATIONS_SUB_ID")
+
+# Message processing
 BATCH_MAX_MESSAGES = env.int("BATCH_MAX_MESSAGES", 20)  # Messages pulled and sent in batches to Movebank
 PULL_CONCURRENCY = env.int("PULL_CONCURRENCY", 5)
 MAX_MESSAGES_PER_FILE = env.int("MESSAGES_PER_FILE", 100)  # Max messages to be sent to Movebank in a single file
