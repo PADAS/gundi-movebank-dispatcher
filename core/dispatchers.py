@@ -2,10 +2,12 @@
 import logging
 import json
 import aiofiles
+import pydantic
 from abc import ABC, abstractmethod
 from gundi_core import schemas
 from movebank_client import MovebankClient
-from core.utils import find_config_for_action
+from .utils import find_config_for_action, ExtraKeys
+from .errors import ReferenceDataError
 
 logger = logging.getLogger(__name__)
 
@@ -92,16 +94,33 @@ class MBDispatcherV2(ABC):
     ) -> MovebankClient:
         # Look for the configuration of the authentication action
         configurations = integration.configurations
+        action_value = schemas.v2.MovebankActions.AUTHENTICATE.value
         auth_action_config = find_config_for_action(
             configurations=configurations,
-            action_value=schemas.v2.MovebankActions.AUTHENTICATE.value
+            action_value=action_value
         )
         if not auth_action_config:
-            raise ValueError(
-                f"Authentication settings for integration {str(integration.id)} are missing. Please fix the integration setup in the portal."
+            error_msg = f"{action_value}` action configuration for integration {str(integration.id)} is missing. Please fix the integration setup in the portal."
+            logger.error(
+                error_msg,
+                extra={
+                    ExtraKeys.AttentionNeeded: True,
+                    ExtraKeys.OutboundIntId: str(integration.id)
+                }
             )
-        # ToDo: Handle validation errors and raise ReferenceDataError?
-        auth_config = schemas.v2.MBAuthActionConfig.parse_obj(auth_action_config.data)
+            raise ReferenceDataError(error_msg)
+        try:
+            auth_config = schemas.v2.MBAuthActionConfig.parse_obj(auth_action_config.data)
+        except pydantic.ValidationError:
+            error_msg = f"Invalid configuration for Movebank action `{action_value}`. Integration id: {integration.id}."
+            logger.error(
+                error_msg,
+                extra={
+                    ExtraKeys.AttentionNeeded: True,
+                    ExtraKeys.OutboundIntId: str(integration.id)
+                }
+            )
+            raise ReferenceDataError(error_msg)
         return MovebankClient(
             base_url=integration.base_url,
             username=auth_config.username,
@@ -125,16 +144,33 @@ class MBTagDataDispatcherV2(MBDispatcherV2):
     async def send(self, messages: list, **kwargs):
         # Look for the configuration of the authentication action
         configurations = self.integration.configurations
+        action_value = schemas.v2.MovebankActions.PUSH_OBSERVATIONS.value
         push_obs_action_config = find_config_for_action(
             configurations=configurations,
-            action_value=schemas.v2.MovebankActions.PUSH_OBSERVATIONS.value
+            action_value=action_value
         )
         if not push_obs_action_config:
-            raise ValueError(
-                f"Push settings for integration {str(self.integration.id)} are missing. Please fix the integration setup in the portal."
+            error_msg = f"`{action_value}` action configuration for integration {str(self.integration.id)} is missing. Please fix the integration setup in the portal."
+            logger.error(
+                error_msg,
+                extra={
+                    ExtraKeys.AttentionNeeded: True,
+                    ExtraKeys.OutboundIntId: str(self.integration.id)
+                }
             )
-        # ToDo: Handle validation errors and raise ReferenceDataError?
-        push_config = schemas.v2.MBPushObservationsActionConfig.parse_obj(push_obs_action_config.data)
+            raise ReferenceDataError()
+        try:
+            push_config = schemas.v2.MBPushObservationsActionConfig.parse_obj(push_obs_action_config.data)
+        except pydantic.ValidationError:
+            error_msg = f"Invalid configuration for Movebank action `{action_value}`. Integration id: {self.integration.id}."
+            logger.error(
+                error_msg,
+                extra={
+                    ExtraKeys.AttentionNeeded: True,
+                    ExtraKeys.OutboundIntId: str(self.integration.id)
+                }
+            )
+            raise ReferenceDataError(error_msg)
         feed = push_config.feed
         tag = kwargs.get("tag")
         return await send_data_to_movebank(
