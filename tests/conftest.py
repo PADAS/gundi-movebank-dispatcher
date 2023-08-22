@@ -354,41 +354,66 @@ def mock_gundi_client_v2_class(mocker, mock_gundi_client_v2):
 @pytest.fixture
 def destination_integration_v2():
     return schemas_v2.Integration.parse_obj(
-        {'id': 'f24281da-253b-4d92-b821-751c39e4be23', 'name': 'ER Load Testing',
-         'base_url': 'https://gundi-load-testing.pamdas.org', 'enabled': True,
-         'type': {'id': '45c66a61-71e4-4664-a7f2-30d465f87aa6', 'name': 'EarthRanger', 'value': 'earth_ranger',
-                  'description': 'Integration type for Earth Ranger Sites', 'actions': [
-                 {'id': '43ec4163-2f40-43fc-af62-bca1db77c06b', 'type': 'auth', 'name': 'Authenticate', 'value': 'auth',
-                  'description': 'Authenticate against Earth Ranger',
-                  'schema': {'type': 'object', 'required': ['token'], 'properties': {'token': {'type': 'string'}}}},
-                 {'id': '036c2098-f494-40ec-a595-710b314d5ea5', 'type': 'pull', 'name': 'Pull Positions',
-                  'value': 'pull_positions', 'description': 'Pull position data from an Earth Ranger site',
-                  'schema': {'type': 'object', 'required': ['endpoint'],
-                             'properties': {'endpoint': {'type': 'string'}}}},
-                 {'id': '9286bb71-9aca-425a-881f-7fe0b2dba4f4', 'type': 'push', 'name': 'Push Events',
-                  'value': 'push_events', 'description': 'EarthRanger sites support sending Events (a.k.a Reports)',
-                  'schema': {}},
-                 {'id': 'aae0cf50-fbc7-4810-84fd-53fb75020a43', 'type': 'push', 'name': 'Push Positions',
-                  'value': 'push_positions', 'description': 'Push position data to an Earth Ranger site',
-                  'schema': {'type': 'object', 'required': ['endpoint'],
-                             'properties': {'endpoint': {'type': 'string'}}}}]},
-         'owner': {'id': 'e2d1b0fc-69fe-408b-afc5-7f54872730c0', 'name': 'Test Organization', 'description': ''},
-         'configurations': [
-             {'id': '013ea7ce-4944-4f7e-8a2f-e5338b3741ce', 'integration': 'f24281da-253b-4d92-b821-751c39e4be23',
-              'action': {'id': '43ec4163-2f40-43fc-af62-bca1db77c06b', 'type': 'auth', 'name': 'Authenticate',
-                         'value': 'auth'}, 'data': {'token': '1190d87681cd1d01ad07c2d0f57d15d6079ae7ab'}},
-             {'id': '5de91c7b-f28a-4ce7-8137-273ac10674d2', 'integration': 'f24281da-253b-4d92-b821-751c39e4be23',
-              'action': {'id': 'aae0cf50-fbc7-4810-84fd-53fb75020a43', 'type': 'push', 'name': 'Push Positions',
-                         'value': 'push_positions'}, 'data': {'endpoint': 'api/v1/positions'}},
-             {'id': '7947b19e-1d2d-4ca3-bd6c-74976ae1de68', 'integration': 'f24281da-253b-4d92-b821-751c39e4be23',
-              'action': {'id': '036c2098-f494-40ec-a595-710b314d5ea5', 'type': 'pull', 'name': 'Pull Positions',
-                         'value': 'pull_positions'}, 'data': {'endpoint': 'api/v1/positions'}}],
-         'additional': {'topic': 'destination-v2-f24281da-253b-4d92-b821-751c39e4be23-dev', 'broker': 'gcp_pubsub'},
-         'default_route': {'id': '38dd8ec2-b3ee-4c31-940e-b6cc9c1f4326', 'name': 'Mukutan - Load Testing'},
-         'status': {'id': 'mockid-b16a-4dbd-ad32-197c58aeef59', 'is_healthy': True,
-                    'details': 'Last observation has been delivered with success.',
-                    'observation_delivered_24hrs': 50231, 'last_observation_delivered_at': '2023-03-31T11:20:00+0200'}
-         }
+        {
+            'id': 'f24281da-253b-4d92-b821-751c39e4be23',
+            'name': 'Movebank Destination',
+            'base_url': 'https://www.movebank.mpg.de',
+            'enabled': True,
+            'type': {
+                'id': '8aa2e415-8bf2-4162-b870-d85a66de48e1',
+                'name': 'Move Bank',
+                'value': 'move_bank',
+                'description': 'Integration type for Move Bank platform',
+                'actions': [
+                    {'id': '39e51ddc-8768-4a3d-9e80-c4b77ebbb10a', 'type': 'auth', 'name': 'Authenticate',
+                     'value': 'auth', 'description': '',
+                     'schema': {'type': 'object', 'required': ['username', 'password'],
+                                'properties': {'password': {'type': 'string'}, 'username': {'type': 'string'}}}},
+                    {'id': '613a09db-4334-4cdf-914c-992cc0bd8ee7', 'type': 'auth', 'name': 'Permissions',
+                     'value': 'permissions', 'description': 'Set permissions per tag_id and user',
+                     'schema': {'type': 'object', 'title': 'MBPermissionsActionConfig', 'properties': {
+                         'study': {'type': 'string', 'title': 'Study', 'default': 'gundi', 'example': 'gundi',
+                                   'description': 'Name of the movebank study'},
+                         'permissions': {'type': 'array', 'items': {'$ref': '#/definitions/MBUserPermission'},
+                                         'title': 'Permissions'}}, 'definitions': {
+                         'MBUserPermission': {'type': 'object', 'title': 'MBUserPermission',
+                                              'required': ['username', 'tag_id'], 'properties': {
+                                 'tag_id': {'type': 'string', 'title': 'Tag Id',
+                                            'example': 'awt.1320894.cc53b809784e406db9cfd8dcbc624985',
+                                            'description': 'Tag ID, to grant the user access to its data.'},
+                                 'username': {'type': 'string', 'title': 'Username', 'example': 'movebankuser',
+                                              'description': 'Username used to login in Movebank'}}}}}},
+                    {'id': 'cc427f07-4dba-49e6-a55b-264034137780', 'type': 'pull', 'name': 'Pull Observations',
+                     'value': 'pull_observations', 'description': 'Pull position data from Move Bank',
+                     'schema': {'type': 'object', 'required': ['endpoint'],
+                                'properties': {'endpoint': {'type': 'string'}}}},
+                    {'id': '1469c6bc-cdb3-4299-a0ff-91adb19f23d5', 'type': 'push', 'name': 'Push Observations',
+                     'value': 'push_observations', 'description': 'Push position data to Move Bank',
+                     'schema': {'type': 'object', 'required': ['feed'],
+                                'properties': {'endpoint': {'type': 'gundi/earthranger'}}}}]},
+            'owner': {'id': 'e2d1b0fc-69fe-408b-afc5-7f54872730c0', 'name': 'Test Organization', 'description': ''},
+            'configurations': [
+                {'id': '00877649-ce4a-497d-ac47-43803f42a2a6', 'integration': 'f24281da-253b-4d92-b821-751c39e4be23',
+                 'action': {'id': '613a09db-4334-4cdf-914c-992cc0bd8ee7', 'type': 'auth', 'name': 'Permissions',
+                            'value': 'permissions'}, 'data': {'study': 'gundi', 'permissions': [
+                    {'tag_id': 'awt.test-device-orfxingdskmp.2b029799-a5a1-4794-a1bd-ac12b85f9249',
+                     'username': 'marianobrc'},
+                    {'tag_id': 'awt.test-device-ptyjhlnkfqgb.2b029799-a5a1-4794-a1bd-ac12b85f9249',
+                     'username': 'marianobrc'},
+                    {'tag_id': 'awt.test-device-qjlvtwzrynfm.2b029799-a5a1-4794-a1bd-ac12b85f9249',
+                     'username': 'marianobrc'}]}},
+                {'id': '30066f0e-ff33-48aa-bd00-84620a8ba8cc', 'integration': 'f24281da-253b-4d92-b821-751c39e4be23',
+                 'action': {'id': '1469c6bc-cdb3-4299-a0ff-91adb19f23d5', 'type': 'push', 'name': 'Push Observations',
+                            'value': 'push_observations'}, 'data': {'feed': 'gundi/earthranger'}},
+                {'id': '50f404f1-8877-45d7-b2c5-5f21db42d575', 'integration': 'f24281da-253b-4d92-b821-751c39e4be23',
+                 'action': {'id': '39e51ddc-8768-4a3d-9e80-c4b77ebbb10a', 'type': 'auth', 'name': 'Authenticate',
+                            'value': 'auth'}, 'data': {'password': 'SomeP4ssw0rd', 'username': 'adminuser'}}],
+            'additional': {}, 'default_route': None,
+            'status': {'id': 'mockid-b16a-4dbd-ad32-197c58aeef59', 'is_healthy': True,
+                       'details': 'Last observation has been delivered with success.',
+                       'observation_delivered_24hrs': 50231,
+                       'last_observation_delivered_at': '2023-03-31T11:20:00+0200'}
+        }
     )
 
 
