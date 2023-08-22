@@ -31,8 +31,6 @@ messages_v1_lock = asyncio.Lock()  # To synchronize coros accessing messages
 messages_v2 = []
 messages_v2_lock = asyncio.Lock()
 
-logger = logging.getLogger(__name__)
-
 
 # ToDo: Move helper functions to a common place once we revisit teh gundi connector / sdk
 async def send_observation_to_dead_letter_topic(transformed_observation, attributes):
@@ -40,7 +38,7 @@ async def send_observation_to_dead_letter_topic(transformed_observation, attribu
             "send_message_to_dead_letter_topic", kind=SpanKind.CLIENT
     ) as current_span:
 
-        print(f"Forwarding observation to dead letter topic: {transformed_observation}")
+        logger.error(f"Forwarding observation to dead letter topic: {transformed_observation}")
         # Publish to another PubSub topic
         connect_timeout, read_timeout = settings.DEFAULT_REQUESTS_TIMEOUT
         timeout_settings = aiohttp.ClientTimeout(
@@ -87,7 +85,7 @@ async def send_data_v1_to_movebank(tag_data, tag_id, outbound_config_id):
                 ExtraKeys.OutboundIntId: outbound_config_id,
             }
             logger.info(
-                "Dispatching observations.",
+                "Dispatching observations..",
                 extra=extra_dict
             )
 
@@ -120,6 +118,10 @@ async def send_data_v1_to_movebank(tag_data, tag_id, outbound_config_id):
                 )
                 raise DispatcherException(f"Exception occurred dispatching observation: {e}")
             else:
+                logger.info(
+                    f"{len(mb_messages)} observations dispatched successfully.",
+                    extra=extra_dict
+                )
                 current_span.set_attribute("is_dispatched_successfully", True)
                 current_span.set_attribute("destination_id", str(outbound_config_id))
                 current_span.add_event(
@@ -185,8 +187,8 @@ async def process_batch_v1(messages: list):
         for config_id, dest_data_iterator in messages_grouped_by_destination:
             tag_data_by_destination = list(dest_data_iterator)
             timestamp = datetime.now()
-            print(
-                f"[{timestamp}] Sending messages for tag {tag} and dest {config_id} to Movebank.."
+            logger.info(
+                f"Sending messages for tag {tag} and dest {config_id} to Movebank.."
             )
             await send_data_v1_to_movebank(
                 tag_data=tag_data_by_destination,
@@ -207,7 +209,7 @@ async def send_data_v2_to_movebank(tag_data, tag_id, destination_id):
                 ExtraKeys.OutboundIntId: destination_id,
             }
             logger.info(
-                "Dispatching observations.",
+                "Dispatching observations..",
                 extra=extra_dict
             )
 
@@ -258,6 +260,10 @@ async def send_data_v2_to_movebank(tag_data, tag_id, destination_id):
                     )
                     raise DispatcherException(f"Exception occurred dispatching observation: {e}")
             else:
+                logger.info(
+                    f"{len(tag_data)} observations dispatched successfully.",
+                    extra=extra_dict
+                )
                 for observation in tag_data:
                     gundi_id = observation["attributes"]["gundi_id"]
                     related_to = observation["attributes"]["related_to"]
@@ -325,8 +331,8 @@ async def process_batch_v2(messages: list):
         for config_id, dest_data_iterator in messages_grouped_by_destination:
             tag_data_by_destination = list(dest_data_iterator)
             timestamp = datetime.now()
-            print(
-                f"[{timestamp}] Sending messages for tag {tag} and dest {config_id} to Movebank.."
+            logger.info(
+                f"Sending messages for tag {tag} and dest {config_id} to Movebank.."
             )
             await send_data_v2_to_movebank(
                 tag_data=tag_data_by_destination,
@@ -353,7 +359,7 @@ async def process_observation_v2(observation):
         retry_attempt: int = attributes.get("retry_attempt") or 0
         logger.debug(f"transformed_observation: {transformed_observation}")
         logger.info(
-            "received transformed observation",
+            "received transformed observation v2",
             extra={
                 ExtraKeys.DeviceId: source_id,
                 ExtraKeys.InboundIntId: provider_id,
@@ -364,12 +370,10 @@ async def process_observation_v2(observation):
         )
         # Buffer messages to process them in batches
         messages_to_process = None
-        now_dt = datetime.now()
-        # print(f"[{now_dt}] Message received: \n {message}")
         async with messages_v2_lock:
             messages_v2.append(observation)
             if len(messages_v1) >= settings.MAX_MESSAGES_PER_FILE:
-                print(f"[{now_dt}] {len(messages_v2)} messages reached. Flushing bufer")
+                logger.info(f"{len(messages_v2)} messages reached. Flushing buffer")
                 messages_to_process = messages_v2.copy()
                 messages_v2.clear()
         if messages_to_process:
@@ -392,9 +396,9 @@ async def process_observation_v1(observation):
         integration_id = attributes.get("integration_id")
         outbound_config_id = attributes.get("outbound_config_id")
         retry_attempt: int = attributes.get("retry_attempt") or 0
-        logger.debug(f"transformed_observation: {transformed_observation}")
+        logger.debug(f"transformed_observation v1: {transformed_observation}")
         logger.info(
-            "received transformed observation",
+            "received transformed observation v1",
             extra={
                 ExtraKeys.DeviceId: device_id,
                 ExtraKeys.InboundIntId: integration_id,
@@ -405,12 +409,10 @@ async def process_observation_v1(observation):
         )
         # Buffer messages to process them in batches
         messages_to_process = None
-        now_dt = datetime.now()
-        # print(f"[{now_dt}] Message received: \n {message}")
         async with messages_v1_lock:
             messages_v1.append(observation)
             if len(messages_v1) >= settings.MAX_MESSAGES_PER_FILE:
-                print(f"[{now_dt}] {len(messages_v1)} messages reached. Flushing bufer")
+                logger.info(f"{len(messages_v2)} messages reached. Flushing buffer")
                 messages_to_process = messages_v1.copy()
                 messages_v1.clear()
         if messages_to_process:
@@ -441,32 +443,30 @@ async def flush_messages_v1():
     global messages_v1_lock
     global messages_v2
     global messages_v2_lock
-    now_dt = datetime.now()
     # Flush messages from Gundi v1
     async with messages_v1_lock:
         messages_to_process = messages_v1.copy()
         messages_v1.clear()
     if messages_to_process:
-        print(f"[{now_dt}] Flushing messages v1. {len(messages_v1)} messages in buffer. ")
+        logger.info(f"Flushing messages v1 due to timeout. Processing {len(messages_to_process)} messages.")
         await process_batch_v1(messages=messages_to_process)
 
 
 async def flush_messages_v2():
     global messages_v2
     global messages_v2_lock
-    now_dt = datetime.now()
     # Flush messages from Gundi v2
     async with messages_v2_lock:
         messages_to_process = messages_v2.copy()
         messages_v2.clear()
     if messages_to_process:
-        print(f"[{now_dt}] Flushing messages v2. {len(messages_v2)} messages in buffer. ")
+        logger.info(f"Flushing messages v1 due to timeout. Processing {len(messages_to_process)} messages.")
         await process_batch_v2(messages=messages_to_process)
 
 
 async def consume_messages():
     subscription_path = f"projects/{settings.GCP_PROJECT_ID}/subscriptions/{settings.TRANSFORMED_OBSERVATIONS_SUB_ID}"
-    print(f"Consuming messages from: \n {subscription_path}")
+    logger.info(f"Consuming messages from: \n {subscription_path}")
     async with pubsub.SubscriberClient() as subscriber_client:
         await pubsub.subscribe(
             subscription_path,
@@ -479,5 +479,5 @@ async def consume_messages():
             enable_nack=True,
             nack_window=0.3,
         )
-    print(f"Consumer stopped.")
+    logger.info(f"Consumer stopped.")
 
