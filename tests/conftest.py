@@ -115,6 +115,10 @@ def mock_movebank_response():
     # Movebank's API doesn't return any content, just 200 OK.
     return ""
 
+@pytest.fixture
+def movebank_client_close_response():
+    return {}
+
 
 @pytest.fixture
 def mock_movebank_client_class(
@@ -133,21 +137,20 @@ def mock_movebank_client_class(
 
 
 @pytest.fixture
-def mock_movebank_client_class_with_service_unavailable_error(
+def mock_movebank_client_class_with_error_once(
         mocker,
         mock_movebank_response,
-        er_client_close_response
+        movebank_client_close_response
 ):
     mocked_movebank_client_class = mocker.MagicMock()
     movebank_client_mock = mocker.MagicMock()
     error = MBClientError('Movebank service unavailable')
-    movebank_client_mock.post_sensor_observation.side_effect = error
-    movebank_client_mock.post_report.side_effect = error
-    movebank_client_mock.post_report_attachment.side_effect = error
-    movebank_client_mock.post_camera_trap_report.side_effect = error
-    movebank_client_mock.close.side_effect = error
+    movebank_client_mock.post_tag_data.side_effect = [  # Fail once
+        error,
+        async_return(mock_movebank_response)
+    ]
     movebank_client_mock.__aenter__.return_value = movebank_client_mock
-    movebank_client_mock.__aexit__.return_value = er_client_close_response
+    movebank_client_mock.__aexit__.return_value = movebank_client_close_response
     mocked_movebank_client_class.return_value = movebank_client_mock
     return mocked_movebank_client_class
 
@@ -342,6 +345,28 @@ def mock_gundi_client_v2(
     )
     mock_client.__aenter__.return_value = mock_client
     return mock_client
+
+
+@pytest.fixture
+def mock_gundi_client_v2_with_error_once(
+        mocker,
+        destination_integration_v2,
+):
+    mock_client = mocker.MagicMock()
+    error = Exception('Movebank service unavailable')
+    mock_client.get_integration_details.side_effect = [  # Fail once
+        error,
+        async_return(destination_integration_v2)
+    ]
+    mock_client.__aenter__.return_value = mock_client
+    return mock_client
+
+
+@pytest.fixture
+def mock_gundi_client_v2_class_with_error_once(mocker, mock_gundi_client_v2_with_error_once):
+    mock_gundi_client_v2_class = mocker.MagicMock()
+    mock_gundi_client_v2_class.return_value = mock_gundi_client_v2_with_error_once
+    return mock_gundi_client_v2_class
 
 
 @pytest.fixture
