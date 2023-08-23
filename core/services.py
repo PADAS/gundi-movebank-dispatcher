@@ -95,14 +95,17 @@ def dead_letter_on_errors(func):
                 # Send observatios to a dead letter pub/sub topic
                 for message in messages:
                     attributes = message["attributes"]
+                    source_id = attributes.get("source_id") or attributes.get("device_id")
+                    provider_id = attributes.get("data_provider_id") or attributes.get("integration_id")
+                    destination_id = attributes.get("destination_id") or attributes.get("outbound_config_id")
                     logger.exception(
                         error_msg,
                         extra={
                             ExtraKeys.AttentionNeeded: True,
                             ExtraKeys.DeadLetter: True,
-                            ExtraKeys.DeviceId: attributes["source_id"],
-                            ExtraKeys.InboundIntId: attributes["data_provider_id"],
-                            ExtraKeys.OutboundIntId: attributes["destination_id"],
+                            ExtraKeys.DeviceId: source_id,
+                            ExtraKeys.InboundIntId: provider_id,
+                            ExtraKeys.OutboundIntId: destination_id,
                             ExtraKeys.StreamType: attributes["observation_type"],
                         },
                     )
@@ -328,8 +331,6 @@ async def send_data_v2_to_movebank(tag_data, tag_id, destination_id):
     (DispatcherException, ReferenceDataError, ),
     max_time=settings.MAX_TIME_RETRIES_SECONDS)
 async def process_batch_v2(messages: list):
-    # To test dead-letter
-    #raise Exception("Internal Error processing observations")
     # Group by tag id
     messages_grouped_by_tag = group_messages_by_tag_id(messages=messages)
     # Process each group serially to avoid too many concurrent requests to Movebank
@@ -368,7 +369,6 @@ async def process_observation_v2(observation):
         source_id = attributes.get("device_id")
         provider_id = attributes.get("data_provider_id")
         destination_id = attributes.get("destination_id")
-        retry_attempt: int = attributes.get("retry_attempt") or 0
         logger.debug(f"transformed_observation: {transformed_observation}")
         logger.info(
             "received transformed observation v2",
@@ -377,7 +377,6 @@ async def process_observation_v2(observation):
                 ExtraKeys.InboundIntId: provider_id,
                 ExtraKeys.OutboundIntId: destination_id,
                 ExtraKeys.StreamType: observation_type,
-                ExtraKeys.RetryAttempt: retry_attempt,
             },
         )
         # Buffer messages to process them in batches
@@ -417,7 +416,6 @@ async def process_observation_v1(observation):
         device_id = attributes.get("device_id")
         integration_id = attributes.get("integration_id")
         outbound_config_id = attributes.get("outbound_config_id")
-        retry_attempt: int = attributes.get("retry_attempt") or 0
         logger.debug(f"transformed_observation v1: {transformed_observation}")
         logger.info(
             "received transformed observation v1",
@@ -425,8 +423,7 @@ async def process_observation_v1(observation):
                 ExtraKeys.DeviceId: device_id,
                 ExtraKeys.InboundIntId: integration_id,
                 ExtraKeys.OutboundIntId: outbound_config_id,
-                ExtraKeys.StreamType: observation_type,
-                ExtraKeys.RetryAttempt: retry_attempt,
+                ExtraKeys.StreamType: observation_type
             },
         )
         # Buffer messages to process them in batches
