@@ -68,3 +68,4 @@ BATCH_MAX_MESSAGES = env.int("BATCH_MAX_MESSAGES", 20)  # Messages pulled and se
 PULL_CONCURRENCY = env.int("PULL_CONCURRENCY", 5)
 MAX_MESSAGES_PER_FILE = env.int("MESSAGES_PER_FILE", 100)  # Max messages to be sent to Movebank in a single file
 FLUSH_TIMEOUT_SECONDS = env.int("FLUSH_TIMEOUT_SECONDS", 1)  # After this time we send the messages we got so far
+MAX_TIME_RETRIES_SECONDS = env.int("MAX_TIME_RETRIES_SECONDS", 86400)   # 24hrs

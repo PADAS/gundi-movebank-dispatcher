@@ -2,18 +2,17 @@ import asyncio
 import json
 import logging
 import aiohttp
+import backoff
+import functools
 from datetime import datetime, timezone
 from gcloud.aio import pubsub
 from itertools import groupby
 from opentelemetry.trace import SpanKind
-from core import dispatchers
 from core.utils import (
     get_outbound_config_detail,
     ExtraKeys,
     get_integration_details,
-    get_dispatched_observation,
     cache_dispatched_observation,
-    is_null,
     publish_event,
 )
 from gundi_core.schemas import v2 as gundi_schemas_v2
@@ -71,6 +70,47 @@ async def send_observation_to_dead_letter_topic(transformed_observation, attribu
         current_span.add_event(
             name="mb_dispatcher.observation_sent_to_dead_letter_queue"
         )
+
+
+def dead_letter_on_errors(func):
+    """Send messages to dead letter on unhandled exceptions"""
+    @functools.wraps(func)
+    async def wrapper_func(messages: list):
+        with tracing.tracer.start_as_current_span(
+                "mb_dispatcher.process_batch", kind=SpanKind.CLIENT
+        ) as current_span:
+            try:
+                current_span.set_attribute("is_batch", True)
+                current_span.set_attribute("batch_size", len(messages))
+                current_span.add_event(
+                    name="mb_dispatcher.transformed_observations_batch"
+                )
+                return await func(messages=messages)
+            except Exception as e:
+                # Unexpected internal errors will be redirected straight to deadletter
+                error_msg = (
+                    f"Unexpected internal error occurred processing observations: {e}"
+                )
+                current_span.set_attribute("error", error_msg)
+                # Send observatios to a dead letter pub/sub topic
+                for message in messages:
+                    attributes = message["attributes"]
+                    logger.exception(
+                        error_msg,
+                        extra={
+                            ExtraKeys.AttentionNeeded: True,
+                            ExtraKeys.DeadLetter: True,
+                            ExtraKeys.DeviceId: attributes["source_id"],
+                            ExtraKeys.InboundIntId: attributes["data_provider_id"],
+                            ExtraKeys.OutboundIntId: attributes["destination_id"],
+                            ExtraKeys.StreamType: attributes["observation_type"],
+                        },
+                    )
+                    transformed_observation = message["data"]
+                    attributes = message["attributes"]
+                    await send_observation_to_dead_letter_topic(transformed_observation, attributes)
+
+    return wrapper_func
 
 
 # ToDo: Retry with backoff?
@@ -137,25 +177,6 @@ async def send_data_v1_to_movebank(tag_data, tag_id, outbound_config_id):
             )
             # Raise the exception so the function execution is marked as failed and retried later
             raise e
-        except Exception as e:
-            error_msg = (
-                f"Unexpected internal error occurred processing transformed observation: {e}"
-            )
-            logger.exception(
-                error_msg,
-                extra={
-                    ExtraKeys.AttentionNeeded: True,
-                    ExtraKeys.DeadLetter: True,
-                    **extra_dict
-                },
-            )
-            # Unexpected internal errors will be redirected straight to deadletter
-            current_span.set_attribute("error", error_msg)
-            # Send observatios to a dead letter pub/sub topic
-            for message in tag_data:
-                transformed_observation = message["data"]
-                attributes = message["attributes"]
-                await send_observation_to_dead_letter_topic(transformed_observation, attributes)
 
 
 def group_messages_by_tag_id(messages):
@@ -172,7 +193,11 @@ def group_messages_by_attribute(messages, attribute):
     )
 
 
-# ToDo: Retry with backoff?
+@dead_letter_on_errors
+@backoff.on_exception(
+    backoff.expo,
+    (DispatcherException, ReferenceDataError, ),
+    max_time=settings.MAX_TIME_RETRIES_SECONDS)
 async def process_batch_v1(messages: list):
     # Group by tag id
     messages_grouped_by_tag = group_messages_by_tag_id(messages=messages)
@@ -295,29 +320,16 @@ async def send_data_v2_to_movebank(tag_data, tag_id, destination_id):
             )
             # Raise the exception so the function execution is marked as failed and retried later
             raise e
-        except Exception as e:
-            error_msg = (
-                f"Unexpected internal error occurred processing transformed observation: {e}"
-            )
-            logger.exception(
-                error_msg,
-                extra={
-                    ExtraKeys.AttentionNeeded: True,
-                    ExtraKeys.DeadLetter: True,
-                    **extra_dict
-                },
-            )
-            # Unexpected internal errors will be redirected straight to deadletter
-            current_span.set_attribute("error", error_msg)
-            # Send observatios to a dead letter pub/sub topic
-            for message in tag_data:
-                transformed_observation = message["data"]
-                attributes = message["attributes"]
-                await send_observation_to_dead_letter_topic(transformed_observation, attributes)
 
 
-# ToDo: Retry with backoff?
+@dead_letter_on_errors
+@backoff.on_exception(
+    backoff.expo,
+    (DispatcherException, ReferenceDataError, ),
+    max_time=settings.MAX_TIME_RETRIES_SECONDS)
 async def process_batch_v2(messages: list):
+    # To test dead-letter
+    #raise Exception("Internal Error processing observations")
     # Group by tag id
     messages_grouped_by_tag = group_messages_by_tag_id(messages=messages)
     # Process each group serially to avoid too many concurrent requests to Movebank
@@ -376,7 +388,17 @@ async def process_observation_v2(observation):
                 logger.info(f"{len(messages_v2)} messages reached. Flushing buffer")
                 messages_to_process = messages_v2.copy()
                 messages_v2.clear()
+            else:
+                current_span.set_attribute("is_buffered", True)
+                current_span.add_event(
+                    name="mb_dispatcher.transformed_observation_buffered"
+                )
         if messages_to_process:
+            current_span.set_attribute("is_batch", True)
+            current_span.set_attribute("batch_size", len(messages_to_process))
+            current_span.add_event(
+                name="mb_dispatcher.transformed_observations_batch"
+            )
             await process_batch_v2(messages=messages_to_process)
 
 
@@ -415,7 +437,17 @@ async def process_observation_v1(observation):
                 logger.info(f"{len(messages_v2)} messages reached. Flushing buffer")
                 messages_to_process = messages_v1.copy()
                 messages_v1.clear()
+            else:
+                current_span.set_attribute("is_buffered", True)
+                current_span.add_event(
+                    name="mb_dispatcher.transformed_observation_buffered"
+                )
         if messages_to_process:
+            current_span.set_attribute("is_batch", True)
+            current_span.set_attribute("batch_size", len(messages_to_process))
+            current_span.add_event(
+                name="mb_dispatcher.transformed_observations_batch"
+            )
             await process_batch_v1(messages=messages_to_process)
 
 
@@ -448,8 +480,11 @@ async def flush_messages_v1():
         messages_to_process = messages_v1.copy()
         messages_v1.clear()
     if messages_to_process:
-        logger.info(f"Flushing messages v1 due to timeout. Processing {len(messages_to_process)} messages.")
-        await process_batch_v1(messages=messages_to_process)
+        with tracing.tracer.start_as_current_span(
+                "mb_dispatcher.flush_messages_v1", kind=SpanKind.CLIENT
+        ) as current_span:
+            logger.info(f"Flushing messages v1 due to timeout. Processing {len(messages_to_process)} messages.")
+            await process_batch_v1(messages=messages_to_process)
 
 
 async def flush_messages_v2():
@@ -460,8 +495,11 @@ async def flush_messages_v2():
         messages_to_process = messages_v2.copy()
         messages_v2.clear()
     if messages_to_process:
-        logger.info(f"Flushing messages v1 due to timeout. Processing {len(messages_to_process)} messages.")
-        await process_batch_v2(messages=messages_to_process)
+        with tracing.tracer.start_as_current_span(
+                "mb_dispatcher.flush_messages_v2", kind=SpanKind.CLIENT
+        ) as current_span:
+            logger.info(f"Flushing messages v2 due to timeout. Processing {len(messages_to_process)} messages.")
+            await process_batch_v2(messages=messages_to_process)
 
 
 async def consume_messages():
