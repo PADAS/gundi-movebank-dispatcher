@@ -1,4 +1,7 @@
 import datetime
+import itertools
+from unittest.mock import DEFAULT
+
 import aiohttp
 import pytest
 import asyncio
@@ -8,6 +11,7 @@ import gundi_core.schemas.v2 as schemas_v2
 from gundi_core import events as system_events
 from gcloud.aio import pubsub
 from core import settings
+from core.errors import ReferenceDataError
 from movebank_client import MBClientError, MBValidationError
 
 
@@ -56,21 +60,32 @@ def mock_cache_with_connection_error(mocker):
 def mock_gundi_client(
         mocker,
         inbound_integration_config,
-        outbound_integration_config,
-        outbound_integration_config_list,
+        outbound_configuration_movebank,
         device,
 ):
     mock_client = mocker.MagicMock()
-    mock_client.get_inbound_integration.return_value = async_return(
-        inbound_integration_config
-    )
     mock_client.get_outbound_integration.return_value = async_return(
-        outbound_integration_config
+        outbound_configuration_movebank
     )
-    mock_client.get_outbound_integration_list.return_value = async_return(
-        outbound_integration_config_list
+    return mock_client
+
+@pytest.fixture
+def mock_gundi_client_with_error_once(
+    mocker,
+    outbound_configuration_movebank
+):
+    mock_client = mocker.MagicMock()
+    mock_client.get_outbound_integration.return_value = async_return(
+        outbound_configuration_movebank
     )
-    mock_client.ensure_device.return_value = async_return(device)
+    error = ReferenceDataError(
+        "Error retrieving integration details from the portal (v2): Server error '502 Bad Gateway' for url 'http://api.gundiservice.org/api/v2/integrations/f24281da-253b-4d92-b821-751c39e4be23/'. For more information check: https://httpstatuses.com/502"
+    )
+    mock_client.get_outbound_integration.side_effect = itertools.chain(
+        [error],
+        itertools.repeat(DEFAULT)
+    )
+    mock_client.__aenter__.return_value = mock_client
     return mock_client
 
 
@@ -115,6 +130,7 @@ def mock_movebank_response():
     # Movebank's API doesn't return any content, just 200 OK.
     return ""
 
+
 @pytest.fixture
 def movebank_client_close_response():
     return {}
@@ -144,11 +160,14 @@ def mock_movebank_client_class_with_error_once(
 ):
     mocked_movebank_client_class = mocker.MagicMock()
     movebank_client_mock = mocker.MagicMock()
+    movebank_client_mock.post_tag_data.return_value = async_return(
+        mock_movebank_response
+    )
     error = MBClientError('Movebank service unavailable')
-    movebank_client_mock.post_tag_data.side_effect = [  # Fail once
-        error,
-        async_return(mock_movebank_response)
-    ]
+    movebank_client_mock.post_tag_data.side_effect = itertools.chain(
+        [error],
+        itertools.repeat(DEFAULT)
+    )
     movebank_client_mock.__aenter__.return_value = movebank_client_mock
     movebank_client_mock.__aexit__.return_value = movebank_client_close_response
     mocked_movebank_client_class.return_value = movebank_client_mock
@@ -182,44 +201,6 @@ def inbound_integration_config():
         "enabled": True,
         "name": "BidTrack - Manyoni",
     }
-
-
-@pytest.fixture
-def outbound_integration_config():
-    return {
-        "id": "2222dc7e-73e2-4af3-93f5-a1cb322e5add",
-        "type": "f61b0c60-c863-44d7-adc6-d9b49b389e69",
-        "owner": "1111191a-bcf3-471b-9e7d-6ba8bc71be9e",
-        "name": "[Internal] AI2 Test -  Bidtrack to  ER",
-        "endpoint": "https://cdip-er.pamdas.org/api/v1.0",
-        "state": {},
-        "login": "",
-        "password": "",
-        "token": "1111d87681cd1d01ad07c2d0f57d15d6079ae7d7",
-        "type_slug": "earth_ranger",
-        "inbound_type_slug": "bidtrack",
-        "additional": {},
-    }
-
-
-@pytest.fixture
-def outbound_integration_config_list():
-    return [
-        {
-            "id": "2222dc7e-73e2-4af3-93f5-a1cb322e5add",
-            "type": "f61b0c60-c863-44d7-adc6-d9b49b389e69",
-            "owner": "1111191a-bcf3-471b-9e7d-6ba8bc71be9e",
-            "name": "[Internal] AI2 Test -  Bidtrack to  ER",
-            "endpoint": "https://cdip-er.pamdas.org/api/v1.0",
-            "state": {},
-            "login": "",
-            "password": "",
-            "token": "1111d87681cd1d01ad07c2d0f57d15d6079ae7d7",
-            "type_slug": "earth_ranger",
-            "inbound_type_slug": "bidtrack",
-            "additional": {},
-        }
-    ]
 
 
 @pytest.fixture
@@ -288,50 +269,20 @@ def transformed_observation_gcp_message():
 
 
 @pytest.fixture
-def outbound_configuration_gcp_pubsub():
-    return OutboundConfiguration.parse_obj(
-        {
-            "id": "1c19dc7e-73e2-4af3-93f5-a1cb322e5add",
-            "type": "f61b0c60-c863-44d7-adc6-d9b49b389e69",
-            "owner": "088a191a-bcf3-471b-9e7d-6ba8bc71be9e",
-            "name": "[Internal] AI2 Test -  Bidtrack to  ER load test",
-            "endpoint": "https://gundi-load-testing.pamdas.org/api/v1.0",
-            "state": {},
-            "login": "",
-            "password": "",
-            "token": "0890d87681cd1d01ad07c2d0f57d15d6079ae7d7",
-            "type_slug": "earth_ranger",
-            "inbound_type_slug": "bidtrack",
-            "additional": {"broker": "gcp_pubsub"},
+def outbound_configuration_movebank():
+    return {
+        'id': 'd16ed1e1-a5e8-4942-b264-bbf5316dda55', 'type': 'bc8c091c-ca5b-4018-b649-2650adcf86a5',
+        'owner': 'e2d1b0fc-69fe-408b-afc5-7f54872730c0', 'name': 'Movebank test',
+        'endpoint': 'https://www.movebank.mpg.de',
+        'state': {},
+        'login': 'adminuser', 'password': 'S@m3Passw0rD',
+        'token': '', 'type_slug': 'movebank',
+        'additional': {
+            'feed': 'gundi/earthranger',
+            'topic': 'destination-movebank-dev',
+            'broker': 'gcp_pubsub'
         }
-    )
-
-
-#
-# @pytest.fixture
-# def position_as_cloud_event():
-#     return CloudEvent(
-#         attributes={
-#             'specversion': '1.0',
-#             'id': '123451234512345',
-#             'source': '//pubsub.googleapis.com/projects/MY-PROJECT/topics/MY-TOPIC',
-#             'type': 'google.cloud.pubsub.topic.v1.messagePublished', 'datacontenttype': 'application/json',
-#             'time': datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-#         },
-#         data={
-#             "message": {
-#                 "data": "eyJtYW51ZmFjdHVyZXJfaWQiOiAiMDE4OTEwOTgwIiwgInNvdXJjZV90eXBlIjogInRyYWNraW5nLWRldmljZSIsICJzdWJqZWN0X25hbWUiOiAiTG9naXN0aWNzIFRydWNrIEEiLCAicmVjb3JkZWRfYXQiOiAiMjAyMy0wMy0wNyAwODo1OTowMC0wMzowMCIsICJsb2NhdGlvbiI6IHsibG9uIjogMzUuNDM5MTIsICJsYXQiOiAtMS41OTA4M30sICJhZGRpdGlvbmFsIjogeyJ2b2x0YWdlIjogIjcuNCIsICJmdWVsX2xldmVsIjogNzEsICJzcGVlZCI6ICI0MSBrcGgifX0=",
-#                 "attributes": {
-#                     "observation_type": "ps",
-#                     "device_id": "018910980",
-#                     "outbound_config_id": "1c19dc7e-73e2-4af3-93f5-a1cb322e5add",
-#                     "integration_id": "36485b4f-88cd-49c4-a723-0ddff1f580c4",
-#                     "tracing_context": "{}"
-#                 }
-#             },
-#             "subscription": "projects/MY-PROJECT/subscriptions/MY-SUB"
-#         }
-#     )
+    }
 
 
 @pytest.fixture
@@ -353,11 +304,16 @@ def mock_gundi_client_v2_with_error_once(
         destination_integration_v2,
 ):
     mock_client = mocker.MagicMock()
-    error = Exception('Movebank service unavailable')
-    mock_client.get_integration_details.side_effect = [  # Fail once
-        error,
-        async_return(destination_integration_v2)
-    ]
+    mock_client.get_integration_details.return_value = async_return(
+        destination_integration_v2
+    )
+    error = ReferenceDataError(
+        "Error retrieving integration details from the portal (v2): Server error '502 Bad Gateway' for url 'http://api.gundiservice.org/api/v2/integrations/f24281da-253b-4d92-b821-751c39e4be23/'. For more information check: https://httpstatuses.com/502"
+    )
+    mock_client.get_integration_details.side_effect = itertools.chain(
+        [error],
+        itertools.repeat(DEFAULT)
+    )
     mock_client.__aenter__.return_value = mock_client
     return mock_client
 
@@ -466,17 +422,33 @@ def observations_batch_v1():
     return [
         {
             'data': {
-                'recorded_at': '2023-08-18T00:00:02Z',
+                'recorded_at': '2023-08-23T00:00:02Z',
+                'tag_id': 'awt.test-device-ptyjhlnkfqgb.2b029799-a5a1-4794-a1bd-ac12b85f9249',
+                'lon': 270.23832401973146, 'lat': -3.4126258080695777, 'sensor_type': 'GPS',
+                'tag_manufacturer_name': 'AWT',
+                'gundi_urn': 'urn:gundi:v1.intsrc.2b029799-a5a1-4794-a1bd-ac12b85f9249.test-device-ptyjhlnkfqgb'
+            },
+            'attributes': {
+                'outbound_config_id': 'd16ed1e1-a5e8-4942-b264-bbf5316dda55',
+                'tracing_context': '{"x-cloud-trace-context": "8fb310d02034fa671ea09f7655c2627b/8607927463316716170;o=1"}',
+                'integration_id': '2b029799-a5a1-4794-a1bd-ac12b85f9249', 'observation_type': 'ps',
+                'device_id': 'test-device-ptyjhlnkfqgb'
+            }
+        },
+        {
+            'data': {
+                'recorded_at': '2023-08-23T00:00:01Z',
                 'tag_id': 'awt.test-device-yhpoqurfnkwv.2b029799-a5a1-4794-a1bd-ac12b85f9249',
-                'lon': -73.23378944234764,
-                'lat': -46.157904554790974,
+                'lon': 335.56862712178133,
+                'lat': -42.089873109164685,
                 'sensor_type': 'GPS',
-                'tag_manufacturer_name': 'YhfcRihikbZjTnRbhmfo',
+                'tag_manufacturer_name': 'AWT',
                 'gundi_urn': 'urn:gundi:v1.intsrc.2b029799-a5a1-4794-a1bd-ac12b85f9249.test-device-yhpoqurfnkwv'
             },
             'attributes': {
-                'device_id': 'test-device-yhpoqurfnkwv',
                 'observation_type': 'ps',
+                'tracing_context': '{"x-cloud-trace-context": "722e20908562f0f7d3c9e29dd427b2a4/1933959524448024112;o=1"}',
+                'device_id': 'test-device-yhpoqurfnkwv',
                 'outbound_config_id': 'd16ed1e1-a5e8-4942-b264-bbf5316dda55',
                 'integration_id': '2b029799-a5a1-4794-a1bd-ac12b85f9249'
             }
@@ -505,6 +477,29 @@ def observations_batch_v2():
                 'stream_type': schemas_v2.StreamPrefixEnum.observation.value,
                 'source_id': 'e301408c-abe7-4658-8707-8ab0583f2b22',
                 'external_source_id': 'test-device-orfxingdskmp',
+                'destination_id': 'f24281da-253b-4d92-b821-751c39e4be23',
+                'data_provider_id': 'ddd0946d-15b0-4308-b93d-e0470b6d33b6',
+                'annotations': '{}'
+            }
+        },
+        {
+            "data": {
+                'recorded_at': '2023-08-18T21:38:00Z',
+                'tag_id': 'awt.test-device-yhpoqurfnkwv.2b029799-a5a1-4794-a1bd-ac12b85f9249',
+                'lon': 35.43902,
+                'lat': -1.59083,
+                'sensor_type': 'GPS',
+                'tag_manufacturer_name': 'AWT',
+                'gundi_urn': 'urn:gundi:v1.intsrc.2b029799-a5a1-4794-a1bd-ac12b85f9249.test-device-yhpoqurfnkwv'
+            },
+            "attributes": {
+                'gundi_version': 'v2',
+                'provider_key': 'ddd0946d-15b0-4308-b93d-e0470b6d33b6',
+                'gundi_id': '3a2c465c-9f53-4d36-a1ac-1bb6e3c4f425',
+                'related_to': None,
+                'stream_type': schemas_v2.StreamPrefixEnum.observation.value,
+                'source_id': 'e301408c-abe7-4658-8707-8ab0583f2b22',
+                'external_source_id': 'test-device-yhpoqurfnkwv',
                 'destination_id': 'f24281da-253b-4d92-b821-751c39e4be23',
                 'data_provider_id': 'ddd0946d-15b0-4308-b93d-e0470b6d33b6',
                 'annotations': '{}'

@@ -116,7 +116,6 @@ def dead_letter_on_errors(func):
     return wrapper_func
 
 
-# ToDo: Retry with backoff?
 async def send_data_v1_to_movebank(tag_data, tag_id, outbound_config_id):
     with tracing.tracer.start_as_current_span(
             "mb_dispatcher.send_data_v1_to_movebank", kind=SpanKind.CLIENT
@@ -178,7 +177,7 @@ async def send_data_v1_to_movebank(tag_data, tag_id, outbound_config_id):
                     **extra_dict
                 },
             )
-            # Raise the exception so the function execution is marked as failed and retried later
+            # Raise the exception so the function is retried
             raise e
 
 
