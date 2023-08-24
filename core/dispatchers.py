@@ -63,9 +63,17 @@ class MBTagDataDispatcher(MBDispatcher):
         super().__init__(config)
 
     async def send(self, messages: list, **kwargs):
-        result = None
-        # ToDo: Handle validation errors and raise ReferenceDataError?
         feed = self.configuration.additional.get("feed")
+        if not feed:
+            error_msg = f"`feed` is missing in the outbound configuration (additional), id {str(self.configuration.id)}. Please fix the integration setup in the portal."
+            logger.error(
+                error_msg,
+                extra={
+                    ExtraKeys.AttentionNeeded: True,
+                    ExtraKeys.OutboundIntId: str(self.configuration.id)
+                }
+            )
+            raise ReferenceDataError(error_msg)
         tag = kwargs.get("tag")
         return await send_data_to_movebank(
             mb_client=self.mb_client,
@@ -158,7 +166,7 @@ class MBTagDataDispatcherV2(MBDispatcherV2):
                     ExtraKeys.OutboundIntId: str(self.integration.id)
                 }
             )
-            raise ReferenceDataError()
+            raise ReferenceDataError(error_msg)
         try:
             push_config = schemas.v2.MBPushObservationsActionConfig.parse_obj(push_obs_action_config.data)
         except pydantic.ValidationError:
