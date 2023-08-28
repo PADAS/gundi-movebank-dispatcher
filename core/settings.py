@@ -69,3 +69,7 @@ PULL_CONCURRENCY = env.int("PULL_CONCURRENCY", 5)  # Messages pulled by each pro
 BATCH_MAX_MESSAGES = env.int("BATCH_MAX_MESSAGES", 100)  # Max messages to be sent to Movebank in a BATCH
 FLUSH_TIMEOUT_SECONDS = env.int("FLUSH_TIMEOUT_SECONDS", 1)  # After this time we send the messages we got so far
 MAX_TIME_RETRIES_SECONDS = env.int("MAX_TIME_RETRIES_SECONDS", 86400)   # 24hrs
+
+# Movebank Credentials
+MOVEBANK_USERNAME = env.str("MOVEBANK_USERNAME")
+MOVEBANK_PASSWORD = env.str("MOVEBANK_PASSWORD")
