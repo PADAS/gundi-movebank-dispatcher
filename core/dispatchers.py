@@ -8,6 +8,8 @@ from gundi_core import schemas
 from movebank_client import MovebankClient
 from .utils import find_config_for_action, ExtraKeys
 from .errors import ReferenceDataError
+from . import settings
+
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +39,13 @@ class MBDispatcher(Dispatcher, ABC):
     def make_mb_client(
         config: schemas.OutboundConfiguration,
     ) -> MovebankClient:
+        # Get credentials from settings, but they can be overriden by configurations in the portal
+        username = config.login or settings.MOVEBANK_USERNAME
+        password = config.password or settings.MOVEBANK_PASSWORD
         return MovebankClient(
             base_url=config.endpoint,
-            username=config.login,
-            password=config.password,
+            username=username,
+            password=password,
             connect_timeout=MBDispatcher.DEFAULT_CONNECT_TIMEOUT_SECONDS,
         )
 
@@ -100,6 +105,9 @@ class MBDispatcherV2(ABC):
     def make_mb_client(
         integration: schemas.v2.Integration,
     ) -> MovebankClient:
+        # Get credentials from settings, but they can be overriden by configurations in the portal
+        username = settings.MOVEBANK_USERNAME
+        password = settings.MOVEBANK_PASSWORD
         # Look for the configuration of the authentication action
         configurations = integration.configurations
         action_value = schemas.v2.MovebankActions.AUTHENTICATE.value
@@ -107,32 +115,26 @@ class MBDispatcherV2(ABC):
             configurations=configurations,
             action_value=action_value
         )
-        if not auth_action_config:
-            error_msg = f"{action_value}` action configuration for integration {str(integration.id)} is missing. Please fix the integration setup in the portal."
-            logger.error(
-                error_msg,
-                extra={
-                    ExtraKeys.AttentionNeeded: True,
-                    ExtraKeys.OutboundIntId: str(integration.id)
-                }
-            )
-            raise ReferenceDataError(error_msg)
-        try:
-            auth_config = schemas.v2.MBAuthActionConfig.parse_obj(auth_action_config.data)
-        except pydantic.ValidationError:
-            error_msg = f"Invalid configuration for Movebank action `{action_value}`. Integration id: {integration.id}."
-            logger.error(
-                error_msg,
-                extra={
-                    ExtraKeys.AttentionNeeded: True,
-                    ExtraKeys.OutboundIntId: str(integration.id)
-                }
-            )
-            raise ReferenceDataError(error_msg)
+        if auth_action_config and auth_action_config.data:
+            try:
+                auth_config = schemas.v2.MBAuthActionConfig.parse_obj(auth_action_config.data)
+            except pydantic.ValidationError:
+                error_msg = f"Invalid configuration for Movebank action `{action_value}`. Integration id: {integration.id}."
+                logger.error(
+                    error_msg,
+                    extra={
+                        ExtraKeys.AttentionNeeded: True,
+                        ExtraKeys.OutboundIntId: str(integration.id)
+                    }
+                )
+                raise ReferenceDataError(error_msg)
+            else:
+                username = auth_config.username
+                password = auth_config.password
         return MovebankClient(
             base_url=integration.base_url,
-            username=auth_config.username,
-            password=auth_config.password,
+            username=username,
+            password=password,
             connect_timeout=MBDispatcher.DEFAULT_CONNECT_TIMEOUT_SECONDS,
         )
 
