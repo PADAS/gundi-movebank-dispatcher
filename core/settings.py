@@ -64,8 +64,8 @@ DISPATCHER_EVENTS_TOPIC = env.str("DISPATCHER_EVENTS_TOPIC", "dispatcher-events-
 TRANSFORMED_OBSERVATIONS_SUB_ID = env.str("TRANSFORMED_OBSERVATIONS_SUB_ID")
 
 # Message processing
-BATCH_MAX_MESSAGES = env.int("BATCH_MAX_MESSAGES", 20)  # Messages pulled and sent in batches to Movebank
-PULL_CONCURRENCY = env.int("PULL_CONCURRENCY", 5)
-MAX_MESSAGES_PER_FILE = env.int("MESSAGES_PER_FILE", 100)  # Max messages to be sent to Movebank in a single file
+PULL_MAX_MESSAGES = env.int("PULL_MAX_MESSAGES", 20)  # Messages pulled by each producer
+PULL_CONCURRENCY = env.int("PULL_CONCURRENCY", 5)  # Messages pulled by each producer
+BATCH_MAX_MESSAGES = env.int("BATCH_MAX_MESSAGES", 100)  # Max messages to be sent to Movebank in a BATCH
 FLUSH_TIMEOUT_SECONDS = env.int("FLUSH_TIMEOUT_SECONDS", 1)  # After this time we send the messages we got so far
 MAX_TIME_RETRIES_SECONDS = env.int("MAX_TIME_RETRIES_SECONDS", 86400)   # 24hrs

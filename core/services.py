@@ -382,7 +382,7 @@ async def process_observation_v2(observation):
         messages_to_process = None
         async with messages_v2_lock:
             messages_v2.append(observation)
-            if len(messages_v1) >= settings.MAX_MESSAGES_PER_FILE:
+            if len(messages_v1) >= settings.BATCH_MAX_MESSAGES:
                 logger.info(f"{len(messages_v2)} messages reached. Flushing buffer")
                 messages_to_process = messages_v2.copy()
                 messages_v2.clear()
@@ -429,7 +429,7 @@ async def process_observation_v1(observation):
         messages_to_process = None
         async with messages_v1_lock:
             messages_v1.append(observation)
-            if len(messages_v1) >= settings.MAX_MESSAGES_PER_FILE:
+            if len(messages_v1) >= settings.BATCH_MAX_MESSAGES:
                 logger.info(f"{len(messages_v2)} messages reached. Flushing buffer")
                 messages_to_process = messages_v1.copy()
                 messages_v1.clear()
@@ -507,9 +507,9 @@ async def consume_messages():
             process_message,
             subscriber_client,
             num_producers=settings.PULL_CONCURRENCY,
-            max_messages_per_producer=settings.BATCH_MAX_MESSAGES,
+            max_messages_per_producer=settings.PULL_MAX_MESSAGES,
             ack_window=0.3,
-            num_tasks_per_consumer=settings.BATCH_MAX_MESSAGES,
+            num_tasks_per_consumer=settings.PULL_MAX_MESSAGES,
             enable_nack=True,
             nack_window=0.3,
         )
