@@ -1,0 +1,13 @@
+serviceAccount: gundi-app-sa-5bbf9d1f@cdip-stage-78ca.iam.gserviceaccount.com
+movebank_dispatcher:
+  env:
+    TRACE_ENVIRONMENT: "stage"
+    REDIS_HOST: "10.243.180.36"
+    CDIP_ADMIN_ENDPOINT: "https://api.stage.gundiservice.org"
+    GUNDI_API_BASE_URL: "https://api.stage.gundiservice.org"
+    GCP_PROJECT_ID: cdip-stage-78ca
+    BUCKET_NAME: "cdip-files-stage"
+    DEAD_LETTER_TOPIC: "destinations-dead-letter-stage"
+    DISPATCHER_EVENTS_TOPIC: "dispatcher-events-stage"
+    TRANSFORMED_OBSERVATIONS_SUB_ID: "destination-movebank-sub-stage"
+replicaCount: 1
