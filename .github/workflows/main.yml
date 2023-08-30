@@ -2,9 +2,8 @@ name: Build and deploy movebank dispatcher
 on:
   push:
     branches:
-      - sik-2362
-      # - main
-      # - 'release-**'
+      - main
+      - 'release-**'
 
 jobs:
   vars:
@@ -23,13 +22,13 @@ jobs:
     uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@v1-stable
     needs: vars
     with:
-      environment: stage
+      environment: dev
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
 
   deploy_dev:
     uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v1-stable
-    # if: startsWith(github.ref, 'refs/heads/main')
+    if: startsWith(github.ref, 'refs/heads/main')
     needs: [vars, build]
     with:
       environment: dev
@@ -38,24 +37,24 @@ jobs:
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
 
-  # deploy_stage:
-  #   uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v1-stable
-  #   if: startsWith(github.ref, 'refs/heads/release')
-  #   needs: [vars, build]
-  #   with:
-  #     environment: stage
-  #     chart_name: movebank-dispatcher
-  #     chart_version: '0.1.0'
-  #     repository: ${{ needs.vars.outputs.repository }}
-  #     tag: ${{ needs.vars.outputs.tag }}
+  deploy_stage:
+    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v1-stable
+    if: startsWith(github.ref, 'refs/heads/release')
+    needs: [vars, build]
+    with:
+      environment: stage
+      chart_name: movebank-dispatcher
+      chart_version: '0.1.0'
+      repository: ${{ needs.vars.outputs.repository }}
+      tag: ${{ needs.vars.outputs.tag }}
 
-  # deploy_prod:
-  #   uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v1-stable
-  #   if: startsWith(github.ref, 'refs/heads/release')
-  #   needs: [vars, build, deploy_stage]
-  #   with:
-  #     environment: prod
-  #     chart_name: movebank-dispatcher
-  #     chart_version: '0.1.0'
-  #     repository: ${{ needs.vars.outputs.repository }}
-  #     tag: ${{ needs.vars.outputs.tag }}
+  deploy_prod:
+    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v1-stable
+    if: startsWith(github.ref, 'refs/heads/release')
+    needs: [vars, build, deploy_stage]
+    with:
+      environment: prod
+      chart_name: movebank-dispatcher
+      chart_version: '0.1.0'
+      repository: ${{ needs.vars.outputs.repository }}
+      tag: ${{ needs.vars.outputs.tag }}
