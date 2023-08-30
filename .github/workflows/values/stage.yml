@@ -1,0 +1,19 @@
+serviceAccount: gundi-app-sa-5bbf9d1f@cdip-stage-78ca.iam.gserviceaccount.com
+ingress:
+  hosts:
+    - host: "sensors-legacy.api.stage.gundiservice.org"
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls:
+    - secretName: "api-tls"
+      hosts:
+        - "sensors-legacy.api.stage.gundiservice.org"
+sensors_api:
+  env:
+    TRACE_ENVIRONMENT: "stage"
+    REDIS_HOST: "10.243.180.36"
+    CDIP_ADMIN_ENDPOINT: "https://api.stage.gundiservice.org"
+    GCP_PROJECT_ID: cdip-stage-78ca
+    BUCKET_NAME: "cdip-files-stage"
+replicaCount: 1

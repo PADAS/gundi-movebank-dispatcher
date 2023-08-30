@@ -1,0 +1,12 @@
+serviceAccount: gundi-app-sa-b2b9960e@cdip-dev-78ca.iam.gserviceaccount.com
+movebank_dispatcher:
+  env:
+    TRACE_ENVIRONMENT: "dev"
+    REDIS_HOST: "10.3.176.132"
+    CDIP_ADMIN_ENDPOINT: "https://api.dev.gundiservice.org"
+    GUNDI_API_BASE_URL: "https://api.dev.gundiservice.org"
+    GCP_PROJECT_ID: cdip-dev-78ca
+    DEAD_LETTER_TOPIC: "destinations-dead-letter-dev"
+    DISPATCHER_EVENTS_TOPIC: "dispatcher-events-dev"
+    TRANSFORMED_OBSERVATIONS_SUB_ID: "destination-movebank-sub-dev"
+replicaCount: 1

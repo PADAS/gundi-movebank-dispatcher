@@ -1,0 +1,19 @@
+serviceAccount: gundi-app-sa-4bb07e9c@cdip-prod1-78ca.iam.gserviceaccount.com
+ingress:
+  hosts:
+    - host: "sensors-legacy.api.gundiservice.org"
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls:
+    - secretName: "api-tls"
+      hosts:
+        - "sensors-legacy.api.gundiservice.org"
+sensors_api:
+  env:
+    TRACE_ENVIRONMENT: "prod"
+    REDIS_HOST: "10.208.106.172"
+    CDIP_ADMIN_ENDPOINT: "https://api.gundiservice.org"
+    GCP_PROJECT_ID: cdip-prod1-78ca
+    BUCKET_NAME: "cdip-files-prod"
+replicaCount: 2
