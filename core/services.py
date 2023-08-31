@@ -448,7 +448,8 @@ async def process_observation_v1(observation):
 
 
 async def process_message(message):
-    # Start Tracing & Logging for troubleshooting
+    # Load OTel context for tracing
+    tracing.pubsub_instrumentation.load_context_from_attributes(message.attributes)
     with tracing.tracer.start_as_current_span(
             "mb_dispatcher.process_transformed_observation", kind=SpanKind.CLIENT
     ) as current_span:
