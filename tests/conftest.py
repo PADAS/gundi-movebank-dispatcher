@@ -1,7 +1,6 @@
 import datetime
 import itertools
 from unittest.mock import DEFAULT
-
 import aiohttp
 import pytest
 import asyncio
