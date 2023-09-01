@@ -405,7 +405,7 @@ async def process_observation_v2(observation):
             current_span.add_event(
                 name="mb_dispatcher.transformed_observations_batch"
             )
-            await process_batch_v2(messages=messages_to_process)
+            asyncio.create_task(process_batch_v2(messages=messages_to_process))
 
 
 async def process_observation_v1(observation):
@@ -452,7 +452,7 @@ async def process_observation_v1(observation):
             current_span.add_event(
                 name="mb_dispatcher.transformed_observations_batch"
             )
-            await process_batch_v1(messages=messages_to_process)
+            asyncio.create_task(process_batch_v1(messages=messages_to_process))
 
 
 async def process_message(message):
@@ -478,8 +478,6 @@ async def process_message(message):
 async def flush_messages_v1():
     global messages_v1
     global messages_v1_lock
-    global messages_v2
-    global messages_v2_lock
     # Flush messages from Gundi v1
     async with messages_v1_lock:
         messages_to_process = messages_v1.copy()
@@ -491,7 +489,7 @@ async def flush_messages_v1():
                 "mb_dispatcher.flush_messages_v1", kind=SpanKind.CLIENT
         ) as current_span:
             logger.info(f"Flushing messages v1 due to timeout. Processing {len(messages_to_process)} messages.")
-            await process_batch_v1(messages=messages_to_process)
+            asyncio.create_task(process_batch_v1(messages=messages_to_process))
 
 
 async def flush_messages_v2():
@@ -502,12 +500,13 @@ async def flush_messages_v2():
         messages_to_process = messages_v2.copy()
         messages_v2.clear()
     if messages_to_process:
+        # Load OTel context for tracing
         tracing.pubsub_instrumentation.load_context_from_attributes(messages_to_process[0]['attributes'])
         with tracing.tracer.start_as_current_span(
                 "mb_dispatcher.flush_messages_v2", kind=SpanKind.CLIENT
         ) as current_span:
             logger.info(f"Flushing messages v2 due to timeout. Processing {len(messages_to_process)} messages.")
-            await process_batch_v2(messages=messages_to_process)
+            asyncio.create_task(process_batch_v2(messages=messages_to_process))
 
 
 async def consume_messages():
