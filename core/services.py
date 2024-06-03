@@ -510,19 +510,21 @@ async def flush_messages_v2():
 
 
 async def consume_messages():
-    subscription_path = f"projects/{settings.GCP_PROJECT_ID}/subscriptions/{settings.TRANSFORMED_OBSERVATIONS_SUB_ID}"
-    logger.info(f"Consuming messages from: \n {subscription_path}")
-    async with pubsub.SubscriberClient() as subscriber_client:
-        await pubsub.subscribe(
-            subscription_path,
-            process_message,
-            subscriber_client,
-            num_producers=settings.PULL_CONCURRENCY,
-            max_messages_per_producer=settings.PULL_MAX_MESSAGES,
-            ack_window=0.3,
-            num_tasks_per_consumer=settings.PULL_MAX_MESSAGES,
-            enable_nack=True,
-            nack_window=0.3,
-        )
-    logger.info(f"Consumer stopped.")
-
+    while True:
+        try:
+            subscription_path = f"projects/{settings.GCP_PROJECT_ID}/subscriptions/{settings.TRANSFORMED_OBSERVATIONS_SUB_ID}"
+            logger.info(f"Consuming messages from: \n {subscription_path}")
+            async with pubsub.SubscriberClient() as subscriber_client:
+                await pubsub.subscribe(
+                    subscription_path,
+                    process_message,
+                    subscriber_client,
+                    num_producers=settings.PULL_CONCURRENCY,
+                    max_messages_per_producer=settings.PULL_MAX_MESSAGES,
+                    ack_window=0.3,
+                    num_tasks_per_consumer=settings.PULL_MAX_MESSAGES,
+                    enable_nack=True,
+                    nack_window=0.3,
+                )
+        except Exception as e:  # GCP closes the connection after a while
+            logger.warning(f"Error consuming messages: {e}. Restarting..")
