@@ -1,4 +1,4 @@
-serviceAccount: gundi-app-sa-5bbf9d1f@cdip-stage-78ca.iam.gserviceaccount.com
+serviceAccount: movebank-dispatcher-sa@cdip-stage-78ca.iam.gserviceaccount.com
 movebank_dispatcher:
   env:
     TRACE_ENVIRONMENT: "stage"
