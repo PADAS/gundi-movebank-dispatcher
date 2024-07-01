@@ -1,4 +1,4 @@
-serviceAccount: gundi-app-sa-4bb07e9c@cdip-prod1-78ca.iam.gserviceaccount.com
+serviceAccount: movebank-dispatcher-sa@cdip-prod1-78ca.iam.gserviceaccount.com
 movebank_dispatcher:
   env:
     TRACE_ENVIRONMENT: "prod"
