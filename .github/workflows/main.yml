@@ -40,7 +40,7 @@ jobs:
             MOVEBANK_PASSWORD: test
             MOVEBANK_USERNAME: test
             TRANSFORMED_OBSERVATIONS_SUB_ID: test
-            TRACING_ENABLED: ${{ False }}
+            TRACING_ENABLED: False
 
   build:
     uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@v2
