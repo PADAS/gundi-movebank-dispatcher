@@ -24,4 +24,4 @@ def configure_tracer(name: str, version: str = ""):
             BatchSpanProcessor(cloud_trace_exporter)
         )
         trace.set_tracer_provider(tracer_provider)
-        return trace.get_tracer(name, version)
+    return trace.get_tracer(name, version)
