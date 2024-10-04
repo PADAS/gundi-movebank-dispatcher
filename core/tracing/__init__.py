@@ -1,3 +1,4 @@
+from core import settings
 from opentelemetry.propagators.cloud_trace_propagator import (
     CloudTraceFormatPropagator,
 )
@@ -7,9 +8,14 @@ from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from . import config
 from . import pubsub_instrumentation
 
-# Capture requests
-AioHttpClientInstrumentor().instrument()
-HTTPXClientInstrumentor().instrument()
+
+if settings.TRACING_ENABLED:
+    # Capture requests 
+    AioHttpClientInstrumentor().instrument()
+    HTTPXClientInstrumentor().instrument()
+else:
+    AioHttpClientInstrumentor().uninstrument()
+    HTTPXClientInstrumentor().uninstrument()
 # Using the X-Cloud-Trace-Context header
 set_global_textmap(CloudTraceFormatPropagator())
 tracer = config.configure_tracer(name="mb-dispatcher", version="0.1.0")
