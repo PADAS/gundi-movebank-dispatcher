@@ -389,10 +389,8 @@ def destination_integration_v2():
                  'action': {'id': '39e51ddc-8768-4a3d-9e80-c4b77ebbb10a', 'type': 'auth', 'name': 'Authenticate',
                             'value': 'auth'}, 'data': {'password': 'SomeP4ssw0rd', 'username': 'adminuser'}}],
             'additional': {}, 'default_route': None,
-            'status': {'id': 'mockid-b16a-4dbd-ad32-197c58aeef59', 'is_healthy': True,
-                       'details': 'Last observation has been delivered with success.',
-                       'observation_delivered_24hrs': 50231,
-                       'last_observation_delivered_at': '2023-03-31T11:20:00+0200'}
+            'status': 'healthy',
+            'status_details': ''
         }
     )
 
