@@ -9,7 +9,7 @@ pytest-asyncio==0.20.3
 pytest-mock==3.10.0
 backoff==2.2
 aiofiles==23.2.1
-gundi-core==1.7.1
+gundi-core==1.11.2
 gundi-client==1.0.4
 gundi-client-v2==2.3.8
 movebank-client==1.0.0
