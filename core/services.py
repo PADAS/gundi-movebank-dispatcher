@@ -51,7 +51,6 @@ async def send_observation_to_dead_letter_topic(transformed_observation, attribu
         "send_message_to_dead_letter_topic", kind=SpanKind.CLIENT
     ) as current_span:
 
-        print(f"Forwarding observation to dead letter topic: {transformed_observation}")
         # Publish to another PubSub topic
         connect_timeout, read_timeout = settings.DEFAULT_REQUESTS_TIMEOUT
         timeout_settings = aiohttp.ClientTimeout(
