@@ -60,7 +60,20 @@ TRACE_ENVIRONMENT = env.str("TRACE_ENVIRONMENT", "dev")
 
 # GCP related settings
 GCP_PROJECT_ID = env.str("GCP_PROJECT_ID", "cdip-78ca")
-DEAD_LETTER_TOPIC = env.str("DEAD_LETTER_TOPIC", "destinations-dead-letter-stage")
+LEGACY_DEAD_LETTER_TOPIC = env.str("DEAD_LETTER_TOPIC", "destinations-dead-letter-stage")
+OBSERVATIONS_DEAD_LETTER_TOPIC = env.str(
+    "OBSERVATIONS_DEAD_LETTER_TOPIC", "observations-dead-letter"
+)
+EVENTS_DEAD_LETTER_TOPIC = env.str("EVENTS_DEAD_LETTER_TOPIC", "events-dead-letter")
+EVENTS_UPDATES_DEAD_LETTER_TOPIC = env.str(
+    "EVENTS_UPDATES_DEAD_LETTER_TOPIC", "events-updates-dead-letter"
+)
+ATTACHMENTS_DEAD_LETTER_TOPIC = env.str(
+    "ATTACHMENTS_DEAD_LETTER_TOPIC", "attachments-dead-letter"
+)
+TEXT_MESSAGES_DEAD_LETTER_TOPIC = env.str(
+    "TEXT_MESSAGES_DEAD_LETTER_TOPIC", "text-messages-dead-letter"
+)
 DISPATCHER_EVENTS_TOPIC = env.str("DISPATCHER_EVENTS_TOPIC", "dispatcher-events-stage")
 TRANSFORMED_OBSERVATIONS_SUB_ID = env.str("TRANSFORMED_OBSERVATIONS_SUB_ID")
 

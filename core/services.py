@@ -31,13 +31,27 @@ messages_v2 = []
 messages_v2_lock = asyncio.Lock()
 
 
-# ToDo: Move helper functions to a common place once we revisit teh gundi connector / sdk
+def get_dlq_topic_for_data_type(data_type: gundi_schemas_v2.StreamPrefixEnum) -> str:
+    if data_type == gundi_schemas_v2.StreamPrefixEnum.observation:
+        return settings.OBSERVATIONS_DEAD_LETTER_TOPIC
+    elif data_type == gundi_schemas_v2.StreamPrefixEnum.event:
+        return settings.EVENTS_DEAD_LETTER_TOPIC
+    elif data_type == gundi_schemas_v2.StreamPrefixEnum.event_update:
+        return settings.EVENTS_UPDATES_DEAD_LETTER_TOPIC
+    elif data_type == gundi_schemas_v2.StreamPrefixEnum.attachment:
+        return settings.ATTACHMENTS_DEAD_LETTER_TOPIC
+    elif data_type == gundi_schemas_v2.StreamPrefixEnum.text_message:
+        return settings.TEXT_MESSAGES_DEAD_LETTER_TOPIC
+    else:
+        return settings.LEGACY_DEAD_LETTER_TOPIC
+
+
 async def send_observation_to_dead_letter_topic(transformed_observation, attributes):
     with tracing.tracer.start_as_current_span(
-            "send_message_to_dead_letter_topic", kind=SpanKind.CLIENT
+        "send_message_to_dead_letter_topic", kind=SpanKind.CLIENT
     ) as current_span:
 
-        logger.error(f"Forwarding observation to dead letter topic: {transformed_observation}")
+        print(f"Forwarding observation to dead letter topic: {transformed_observation}")
         # Publish to another PubSub topic
         connect_timeout, read_timeout = settings.DEFAULT_REQUESTS_TIMEOUT
         timeout_settings = aiohttp.ClientTimeout(
@@ -48,11 +62,18 @@ async def send_observation_to_dead_letter_topic(transformed_observation, attribu
         ) as session:
             client = pubsub.PublisherClient(session=session)
             # Get the topic
-            topic_name = settings.DEAD_LETTER_TOPIC
+            if attributes.get("gundi_version", "v1") == "v2":
+                topic_name = get_dlq_topic_for_data_type(
+                    data_type=attributes.get("stream_type")
+                )
+            else:
+                topic_name = settings.LEGACY_DEAD_LETTER_TOPIC
             current_span.set_attribute("topic", topic_name)
             topic = client.topic_path(settings.GCP_PROJECT_ID, topic_name)
             # Prepare the payload
-            binary_payload = json.dumps(transformed_observation, default=str).encode("utf-8")
+            binary_payload = json.dumps(transformed_observation, default=str).encode(
+                "utf-8"
+            )
             messages = [pubsub.PubsubMessage(binary_payload, **attributes)]
             logger.info(f"Sending observation to PubSub topic {topic_name}..")
             try:  # Send to pubsub
@@ -68,7 +89,7 @@ async def send_observation_to_dead_letter_topic(transformed_observation, attribu
 
         current_span.set_attribute("is_sent_to_dead_letter_queue", True)
         current_span.add_event(
-            name="mb_dispatcher.observation_sent_to_dead_letter_queue"
+            name="routing_service.observation_sent_to_dead_letter_queue"
         )
 
 
