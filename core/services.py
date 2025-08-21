@@ -533,6 +533,7 @@ async def consume_messages():
         try:
             subscription_path = f"projects/{settings.GCP_PROJECT_ID}/subscriptions/{settings.TRANSFORMED_OBSERVATIONS_SUB_ID}"
             logger.info(f"Consuming messages from: \n {subscription_path}")
+            logger.info(f"Retry settings: \n MAX_TIME_RETRIES_SECONDS: {settings.MAX_TIME_RETRIES_SECONDS}")
             async with pubsub.SubscriberClient() as subscriber_client:
                 await pubsub.subscribe(
                     subscription_path,
