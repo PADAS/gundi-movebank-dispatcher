@@ -114,7 +114,7 @@ def dead_letter_on_errors(func):
                 current_span.set_attribute("error", error_msg)
                 # Send observatios to a dead letter pub/sub topic
                 for message in messages:
-                    attributes = message["attributes"]
+                    attributes = message.get("attributes", {})
                     source_id = attributes.get("source_id") or attributes.get("device_id")
                     provider_id = attributes.get("data_provider_id") or attributes.get("integration_id")
                     destination_id = attributes.get("destination_id") or attributes.get("outbound_config_id")
@@ -126,11 +126,10 @@ def dead_letter_on_errors(func):
                             ExtraKeys.DeviceId: source_id,
                             ExtraKeys.InboundIntId: provider_id,
                             ExtraKeys.OutboundIntId: destination_id,
-                            ExtraKeys.StreamType: attributes["observation_type"],
+                            ExtraKeys.StreamType: attributes.get("stream_type", "unknown"),
                         },
                     )
-                    transformed_observation = message["data"]
-                    attributes = message["attributes"]
+                    transformed_observation = message.get("data", {})
                     await send_observation_to_dead_letter_topic(transformed_observation, attributes)
 
     return wrapper_func
