@@ -27,7 +27,7 @@ jobs:
           uses: actions/checkout@v4
         - uses: actions/setup-python@v5
           with:
-            python-version: '3.8' 
+            python-version: '3.8'
         - name: Install pip
           run: python -m ensurepip --upgrade
         - name: Install dependencies
@@ -37,9 +37,9 @@ jobs:
         - name: Run unit tests
           run: pytest -s
           env:
-            MOVEBANK_PASSWORD: test
-            MOVEBANK_USERNAME: test
-            TRANSFORMED_OBSERVATIONS_SUB_ID: test
+            MOVEBANK_PASSWORD: test  # pragma: allowlist secret
+            MOVEBANK_USERNAME: test  # pragma: allowlist secret
+            TRANSFORMED_OBSERVATIONS_SUB_ID: test  # pragma: allowlist secret
             TRACING_ENABLED: False
 
   build:
@@ -51,8 +51,11 @@ jobs:
       tag: ${{ needs.vars.outputs.tag }}
 
   deploy_dev:
+    # Disabled: gundi-dev migrated to ArgoCD via DASOPS-1995.
+    # Image bumps for dev now go through a values commit in
+    # PADAS/serca-argocd-apps:gundi/movebank-dispatcher/values-gundi-dev.yaml.
     uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
-    if: startsWith(github.ref, 'refs/heads/main')
+    if: false
     needs: [vars, build]
     with:
       environment: dev
@@ -60,7 +63,7 @@ jobs:
       chart_version: '0.1.0'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
-    secrets: inherit
+    secrets: inherit  # pragma: allowlist secret
 
   deploy_stage:
     uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
@@ -72,7 +75,7 @@ jobs:
       chart_version: '0.1.0'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
-    secrets: inherit
+    secrets: inherit  # pragma: allowlist secret
 
   deploy_prod:
     uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
@@ -84,4 +87,4 @@ jobs:
       chart_version: '0.1.0'
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
-    secrets: inherit
+    secrets: inherit  # pragma: allowlist secret
