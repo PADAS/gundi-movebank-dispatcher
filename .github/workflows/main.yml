@@ -51,18 +51,17 @@ jobs:
       tag: ${{ needs.vars.outputs.tag }}
 
   deploy_dev:
-    # Disabled: gundi-dev migrated to ArgoCD via DASOPS-1995.
-    # Image bumps for dev now go through a values commit in
-    # PADAS/serca-argocd-apps:gundi/movebank-dispatcher/values-gundi-dev.yaml.
-    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
-    if: false
+    # gundi-dev is reconciled by ArgoCD. This job bumps the image tag in
+    # PADAS/serca-argocd-apps:gundi/movebank-dispatcher/values-gundi-dev.yaml and
+    # lets ArgoCD's automated selfHeal pick up the change.
+    uses: PADAS/gundi-workflows/.github/workflows/deploy_argocd.yml@v8
+    if: startsWith(github.ref, 'refs/heads/main')
     needs: [vars, build]
     with:
-      environment: dev
-      chart_name: movebank-dispatcher
-      chart_version: '0.1.0'
-      repository: ${{ needs.vars.outputs.repository }}
-      tag: ${{ needs.vars.outputs.tag }}
+      app-name: movebank-dispatcher
+      environment: gundi-dev
+      image-repository: ${{ needs.vars.outputs.repository }}
+      image-tag: ${{ needs.vars.outputs.tag }}
     secrets: inherit  # pragma: allowlist secret
 
   deploy_stage:
