@@ -79,13 +79,15 @@ jobs:
     secrets: inherit  # pragma: allowlist secret
 
   deploy_prod:
-    uses: PADAS/gundi-workflows/.github/workflows/deploy_k8s.yml@v2
+    # gundi-prod is reconciled by ArgoCD. This job bumps the image tag in
+    # PADAS/serca-argocd-apps:gundi/movebank-dispatcher/values-gundi-prod.yaml and
+    # lets ArgoCD's automated selfHeal pick up the change.
+    uses: PADAS/gundi-workflows/.github/workflows/deploy_argocd.yml@v8
     if: startsWith(github.ref, 'refs/heads/release')
     needs: [vars, build, deploy_stage]
     with:
-      environment: prod
-      chart_name: movebank-dispatcher
-      chart_version: '0.1.0'
-      repository: ${{ needs.vars.outputs.repository }}
-      tag: ${{ needs.vars.outputs.tag }}
+      app-name: movebank-dispatcher
+      environment: gundi-prod
+      image-repository: ${{ needs.vars.outputs.repository }}
+      image-tag: ${{ needs.vars.outputs.tag }}
     secrets: inherit  # pragma: allowlist secret
