@@ -1,4 +1,4 @@
-FROM python:3.8-slim
+FROM europe-west3-docker.pkg.dev/serca-artifact-registry/virtual-docker/python:3.8-slim
 
 WORKDIR /app
 COPY requirements.txt .
