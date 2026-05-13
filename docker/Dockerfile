@@ -1,4 +1,5 @@
-FROM europe-west3-docker.pkg.dev/serca-artifact-registry/virtual-docker/python:3.8-slim
+ARG BASE_REGISTRY=""
+FROM ${BASE_REGISTRY}python:3.8-slim
 
 WORKDIR /app
 COPY requirements.txt .
