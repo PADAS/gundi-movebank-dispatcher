@@ -79,13 +79,21 @@ jobs:
       image-tag: ${{ needs.vars.outputs.tag }}
     secrets: inherit  # pragma: allowlist secret
 
+  approve_prod:
+    runs-on: ubuntu-latest
+    environment: prod
+    if: startsWith(github.ref, 'refs/heads/release')
+    needs: [vars, build, deploy_stage]
+    steps:
+      - run: echo "Approved for prod"
+
   deploy_prod:
     # gundi-prod is reconciled by ArgoCD. This job bumps the image tag in
     # PADAS/serca-argocd-apps:gundi/movebank-dispatcher/values-gundi-prod.yaml and
     # lets ArgoCD's automated selfHeal pick up the change.
     uses: PADAS/gundi-workflows/.github/workflows/deploy_argocd.yml@v8
     if: startsWith(github.ref, 'refs/heads/release')
-    needs: [vars, build, deploy_stage]
+    needs: [vars, build, deploy_stage, approve_prod]
     with:
       app-name: movebank-dispatcher
       environment: gundi-prod
