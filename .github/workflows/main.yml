@@ -53,7 +53,7 @@ jobs:
       tag: ${{ needs.vars.outputs.tag }}
 
   build_serca:
-    uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@v10
+    uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@v11
     needs: [run_unit_tests, vars]
     with:
       workload_identity_provider: "projects/563316706574/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"  # pragma: allowlist secret
