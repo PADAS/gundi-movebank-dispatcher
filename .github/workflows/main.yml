@@ -46,7 +46,7 @@ jobs:
     uses: PADAS/gundi-workflows/.github/workflows/build_docker.yml@v11
     needs: [run_unit_tests, vars]
     with:
-      workload_identity_provider: "projects/563316706574/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"  # pragma: allowlist secret
+      workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
       repository: ${{ needs.vars.outputs.repository }}
       tag: ${{ needs.vars.outputs.tag }}
       build-args: BASE_REGISTRY=europe-west3-docker.pkg.dev/serca-artifact-registry/virtual-docker/
